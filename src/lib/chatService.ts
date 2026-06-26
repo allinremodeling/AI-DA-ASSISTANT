@@ -1,5 +1,6 @@
 import type { ChatMessage, StructuredChatResponse } from './types';
 import { matchPortfolio, ALLIN_PORTFOLIO } from './portfolio';
+import { ECOSYSTEM } from './brand';
 
 const CHAT_API = '/.netlify/functions/chat';
 const GUEST_MESSAGE_LIMIT = 1;
@@ -9,7 +10,7 @@ export function getGuestMessageLimit(): number {
 }
 
 function structuredToMessage(data: StructuredChatResponse): ChatMessage {
-  const summary = [data.intro, ...(data.blocks?.map((b) => b.title) || [])].filter(Boolean).join(' · ');
+  const summary = data.intro || 'Consulta AI-DA completada';
 
   return {
     id: `msg_${Date.now()}`,
@@ -19,6 +20,7 @@ function structuredToMessage(data: StructuredChatResponse): ChatMessage {
     blocks: data.blocks,
     followUp: data.followUp,
     products: data.products?.length ? data.products : undefined,
+    smartslabListings: data.smartslabListings?.length ? data.smartslabListings : undefined,
     generatedImage: data.generatedImage,
   };
 }
@@ -77,110 +79,65 @@ export async function sendChatMessage(
 }
 
 function buildLocalMockResponse(content: string, hasImage: boolean, guest: boolean): ChatMessage {
-  const portfolio = matchPortfolio(content, 3);
-  const p = (i: number) => portfolio[i]?.imageUrl || ALLIN_PORTFOLIO[i % ALLIN_PORTFOLIO.length].imageUrl;
-
-  const isLayout = /\d+/.test(content) && /pulgada|inch|layout|medida|dimension/i.test(content);
-  const isProduct = /producto|cuarzo|gabinete|shaker|quartz|cabinet|buscar|inventario/i.test(content);
-
-  if (isLayout) {
-    const dims = content.match(/(\d+(?:\.\d+)?)/g);
-    const w = dims ? parseFloat(dims[0]) : 120;
-    const l = dims ? parseFloat(dims[1] || dims[0]) : 108;
-
-    return structuredToMessage({
-      intro: `Layout optimizado para ${w}" × ${l}" (${Math.round((w * l) / 144)} sq ft).`,
-      blocks: [
-        {
-          type: 'analysis',
-          title: 'Distribución recomendada',
-          text: w >= 144
-            ? 'Layout en U con isla central de 36"×60". Circulación de 42" entre frentes de trabajo.'
-            : w >= 120
-              ? 'Layout en L con opción de isla compacta 30"×48" si el flujo lo permite.'
-              : 'Layout lineal o L compacto; isla no recomendada por espacio limitado.',
-          imageUrl: p(0),
-          tags: ['layout', 'medidas'],
-        },
-        {
-          type: 'trend',
-          title: 'Referencia All In — Calacatta Alpharetta',
-          text: 'Proyecto real con isla Calacatta en Alpharetta, GA. Referencia ideal para layouts con isla central.',
-          imageUrl: p(1),
-          source: 'All In Remodeling Portfolio',
-          tags: ['proyecto real'],
-        },
-        {
-          type: 'recommendation',
-          title: 'Estimación de materiales',
-          text: `${Math.ceil(w / 24)} gabinetes base, ${Math.ceil(w / 30)} gabinetes wall, encimera cuarzo ${w >= 120 ? '96"' : '72"'}. Presupuesto orientativo: $${(Math.ceil(w / 24) * 300 + 1500).toLocaleString()}.`,
-          imageUrl: p(2),
-          tags: ['presupuesto'],
-        },
-      ],
-      followUp: guest
-        ? 'Consulta express completada. Crea cuenta para buscar productos en inventario.'
-        : '¿Buscamos los gabinetes y cuarzo en nuestro catálogo?',
-    });
-  }
-
-  if (isProduct) {
-    return structuredToMessage({
-      intro: 'Estas combinaciones están alineadas con nuestro catálogo All In Remodeling.',
-      blocks: [
-        {
-          type: 'trend',
-          title: portfolio[0]?.title || 'Calacatta Quartz',
-          text: portfolio[0]?.text || 'Cuarzo Calacatta — bestseller All In Remodeling.',
-          imageUrl: p(0),
-          source: 'All In Remodeling Portfolio',
-          tags: ['bestseller'],
-        },
-        {
-          type: 'inspiration',
-          title: portfolio[1]?.title || 'Golden Carrara',
-          text: portfolio[1]?.text || 'Referencia de cocina con piedra cálida.',
-          imageUrl: p(1),
-          source: 'All In Remodeling Portfolio',
-          tags: ['inspiración'],
-        },
-      ],
-      followUp: guest ? 'Inicia sesión para ver precios e inventario en vivo.' : '¿Filtramos por precio o estilo?',
-    });
-  }
+  const portfolio = matchPortfolio(content, 2);
+  const p0 = portfolio[0] || ALLIN_PORTFOLIO[1];
+  const p1 = portfolio[1] || ALLIN_PORTFOLIO[2];
 
   return structuredToMessage({
-    intro: hasImage
-      ? 'Analicé tu espacio y lo contrasté con tendencias actuales de remodelación.'
-      : 'Aquí tienes inspiración basada en tendencias de diseño 2026.',
+    intro: 'Consulta AI-DA (modo demo local). En producción Netlify conecta Claude Vision, SmartSlab y el ecosistema All In.',
     blocks: [
       {
-        type: 'analysis',
-        title: hasImage ? 'Análisis visual' : 'Tu consulta',
+        type: 'visual_analysis',
+        title: hasImage ? 'Análisis visual' : 'Evaluación inicial',
         text: hasImage
-          ? 'Conecta a Netlify con ANTHROPIC_API_KEY para análisis Claude Vision en producción. Referencias basadas en portfolio All In.'
-          : 'Referencias de cocinas y baños reales de All In Remodeling en Georgia.',
-        tags: ['análisis'],
+          ? 'Activa ANTHROPIC_API_KEY en Netlify para análisis Claude Vision de tu foto.'
+          : content.slice(0, 200),
+        tags: ['AI-DA'],
       },
-      ...portfolio.slice(0, 3).map((item) => ({
-        type: 'inspiration' as const,
-        title: item.title,
-        text: `${item.text} · ${item.location}`,
-        imageUrl: item.imageUrl,
-        source: 'All In Remodeling Portfolio',
-        tags: ['proyecto real'],
-      })),
       {
-        type: 'recommendation',
-        title: 'Agenda con All In Remodeling',
-        text: 'Consulta virtual o visita al showroom. Especialistas en cuarzo, gabinetes y remodelaciones integrales en Georgia.',
-        imageUrl: ALLIN_PORTFOLIO[0].imageUrl,
-        source: 'allinremodeling.us',
-        tags: ['cita'],
+        type: 'external_inspiration',
+        title: 'Tendencia: Calacatta & Waterfall',
+        text: 'Referencia de diseño 2026 mostrada aquí — sin salir del chat.',
+        imageUrl: p0.imageUrl,
+        source: 'Design trend 2026',
+        tags: ['tendencia'],
+      },
+      {
+        type: 'ecosystem',
+        title: `${p0.title} · SmartSlab Calacatta`,
+        text: `${p0.text} Slabs y remanentes disponibles vía SmartSlab en Georgia.`,
+        imageUrl: p1.imageUrl,
+        source: 'All In Remodeling · SmartSlab',
+        tags: ['ecosistema'],
+      },
+      {
+        type: 'action_plan',
+        title: 'Plan con All In — hablar con asesor',
+        text: 'Pasos para concretar tu remodelación con nuestro equipo.',
+        steps: [
+          { step: 1, title: 'Consulta virtual', description: '15 min con un asesor All In Remodeling.' },
+          { step: 2, title: 'Selección de materiales', description: 'Showroom + SmartSlab marketplace.' },
+          { step: 3, title: 'Cotización', description: 'Propuesta detallada sin compromiso.' },
+          { step: 4, title: guest ? 'Crear cuenta AI-DA' : 'Ejecución', description: guest ? 'Guarda diseño y continúa.' : 'All In Builders instala.' },
+        ],
+        ctaLabel: 'Agendar consulta',
+        ctaType: 'virtual',
+        tags: ['asesor'],
       },
     ],
-    followUp: guest
-      ? 'Consulta express completada. Regístrate para renders, inventario y más preguntas.'
-      : '¿Generamos un render conceptual o buscamos productos en inventario?',
+    smartslabListings: [
+      {
+        id: 'demo-1',
+        name: 'Calacatta Hudson',
+        material: 'Quartz',
+        type: 'full_slab',
+        location: 'Norcross, GA',
+        sqft: 56.4,
+        price: 1045,
+        image_url: p0.imageUrl,
+        url: ECOSYSTEM.smartslab.browse,
+      },
+    ],
+    followUp: guest ? 'Crea cuenta para continuar con un asesor.' : '¿Agendamos tu consulta virtual?',
   });
 }

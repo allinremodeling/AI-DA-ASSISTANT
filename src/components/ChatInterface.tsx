@@ -19,11 +19,11 @@ import { cn } from '../lib/utils'
 import { sendChatMessage, getGuestMessageLimit } from '../lib/chatService'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
-import { BRAND, BRAND_COLORS } from '../lib/brand'
+import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { BrandMark } from './BrandMark'
 
-const WELCOME_AUTH = `Bienvenido al asistente AI de ${BRAND.name}.\n\nSube una foto de tu cocina o baño para análisis con Claude Vision, tendencias de diseño y referencias de nuestros proyectos reales en Georgia.`
-const WELCOME_GUEST = `Consulta express gratuita · ${BRAND.tagline}\n\nSube una foto y recibe análisis visual + referencias de proyectos reales de All In Remodeling. Sin guardar historial.`
+const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
+const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\n1 consulta gratuita con análisis visual y plan de acción All In. Sin guardar historial.`
 
 export function ChatInterface({
   mode = 'authenticated',
@@ -270,7 +270,7 @@ export function ChatInterface({
               </div>
               <div className="p-3 border-t border-[#e5e5e5]">
                 <a
-                  href={BRAND.website}
+                  href={ECOSYSTEM.remodeling.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-2 text-xs text-[#6b6b6b] hover:text-[#111111] transition-colors"
@@ -386,7 +386,7 @@ export function ChatInterface({
               <Menu className="w-5 h-5 text-[#6b6b6b]" />
             </button>
             <h2 className="text-sm font-medium text-[#6b6b6b]">
-              {isGuest ? `Consulta express · ${BRAND.name}` : `${BRAND.name} · Design AI`}
+              {isGuest ? `Consulta express · ${BRAND.productName}` : `${BRAND.productFullName}`}
             </h2>
             {isGuest && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
@@ -431,14 +431,14 @@ export function ChatInterface({
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <BrandMark size="lg" />
                 </div>
-                <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2 font-serif">
-                  {BRAND.name}
+                <h1 className="text-2xl font-bold text-[#0a0a0a] mb-2">
+                  {BRAND.productFullName}
                 </h1>
                 <p className="text-xs tracking-[0.15em] uppercase mb-4" style={{ color: BRAND_COLORS.accent }}>
                   {BRAND.tagline}
                 </p>
-                <p className="text-[#6b6b6b] text-lg mb-8 leading-relaxed">
-                  Sube una foto para análisis con Claude Vision. Referencias de cocinas y baños reales de Georgia.
+                <p className="text-[#6b6b6b] text-base mb-8 leading-relaxed">
+                  Análisis visual · Inspiración · Ecosistema All In + SmartSlab · Plan con asesor
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                   {[
@@ -493,6 +493,7 @@ export function ChatInterface({
                           blocks={message.blocks}
                           followUp={message.followUp}
                           products={message.products}
+                          smartslabListings={message.smartslabListings}
                           generatedImage={message.generatedImage}
                         />
                         {!message.blocks?.length && (

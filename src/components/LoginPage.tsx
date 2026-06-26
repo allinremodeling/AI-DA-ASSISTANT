@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Loader2, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
-import { BRAND, BRAND_COLORS } from '../lib/brand'
+import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { BrandHeader } from './BrandMark'
 
 export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
@@ -90,8 +90,16 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
             <Phone className="w-3 h-3" />
             {BRAND.phone}
           </a>
-          <a href={BRAND.website} target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1a1a]">
-            {BRAND.website.replace('https://', '')}
+          <a href={ECOSYSTEM.remodeling.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1a1a]">
+            allinremodeling.us
+          </a>
+          <span className="text-[#ccc]">·</span>
+          <a href={ECOSYSTEM.builders.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1a1a]">
+            allinbuilders.us
+          </a>
+          <span className="text-[#ccc]">·</span>
+          <a href={ECOSYSTEM.smartslab.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1a1a]">
+            smartslab.app
           </a>
         </div>
 

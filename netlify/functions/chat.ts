@@ -1,6 +1,8 @@
 import { matchCuratedTrends, searchDesignTrends, matchPortfolio } from './lib/trends';
 import { analyzeImageWithClaude } from './lib/vision';
 import { ALLIN_PORTFOLIO } from './lib/portfolio';
+import { matchEcosystemServices, buildActionPlanSteps } from './lib/ecosystem';
+import { searchSmartSlabListings, type SmartSlabRow } from './lib/smartslab';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -22,6 +24,9 @@ interface DesignBlock {
   imageUrl?: string;
   source?: string;
   tags?: string[];
+  steps?: { step: number; title: string; description: string }[];
+  ctaLabel?: string;
+  ctaType?: string;
 }
 
 interface ProductRow {
@@ -52,176 +57,163 @@ async function searchProducts(query: string): Promise<ProductRow[]> {
   const url = new URL(`${SUPABASE_URL}/rest/v1/products`);
   url.searchParams.set('select', '*');
   url.searchParams.set('name', `ilike.*${query}*`);
-  url.searchParams.set('limit', '6');
+  url.searchParams.set('limit', '4');
 
   const res = await fetch(url.toString(), {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
-
   if (!res.ok) return [];
   return res.json();
 }
 
-function enrichBlocksWithReferenceImages(
+async function polishIntroAndTexts(
+  message: string,
+  visionAnalysis: string,
   blocks: DesignBlock[],
-  referenceImages: { imageUrl: string; source: string }[],
-): DesignBlock[] {
-  let refIndex = 0;
-  return blocks.map((block) => {
-    if (block.type === 'analysis') return block;
-    if (block.imageUrl?.includes('unsplash.com')) {
-      const ref = referenceImages[refIndex++ % referenceImages.length];
-      return { ...block, imageUrl: ref.imageUrl, source: block.source || ref.source };
+): Promise<{ intro: string; followUp: string }> {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY.includes('your-key')) {
+    return {
+      intro: 'Tu consulta AI-DA está lista. Revisa cada sección y al final encontrarás el plan para hablar con un asesor All In.',
+      followUp: '¿Listo para dar el siguiente paso? Usa los botones del plan de acción o responde con tus medidas y presupuesto objetivo.',
+    };
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres copywriter de AI-DA (All In Builders / All In Remodeling). Responde JSON: {"intro":"2 oraciones","followUp":"1 pregunta cierre"} en español, tono profesional y cercano.',
+          },
+          {
+            role: 'user',
+            content: `Consulta: ${message}\nAnálisis visual: ${visionAnalysis || 'N/A'}\nBloques: ${blocks.map((b) => b.title).join(', ')}`,
+          },
+        ],
+        max_tokens: 300,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return JSON.parse(data.choices?.[0]?.message?.content);
     }
-    if (!block.imageUrl && referenceImages.length > 0) {
-      const ref = referenceImages[refIndex++ % referenceImages.length];
-      return { ...block, imageUrl: ref.imageUrl, source: block.source || ref.source };
-    }
-    return block;
-  });
+  } catch {
+    // fallback below
+  }
+
+  return {
+    intro: 'Análisis completo con referencias del ecosistema All In — listo para conectar con un asesor.',
+    followUp: '¿Quieres que un asesor te contacte para cotización detallada?',
+  };
 }
 
-function buildMockResponse(
+function buildFourPillarBlocks(
   message: string,
   hasImage: boolean,
   guest: boolean,
   visionAnalysis: string,
-) {
-  const trends = matchCuratedTrends(message, 3);
-  const portfolio = matchPortfolio(message, 2);
+  externalTrend: { title: string; text: string; imageUrl: string; source: string },
+  portfolioItem: (typeof ALLIN_PORTFOLIO)[0],
+  smartslab: SmartSlabRow,
+  products: ProductRow[],
+  services: { brand: string; name: string; url: string }[],
+): DesignBlock[] {
+  const productLine =
+    products.length > 0
+      ? `Productos All In Remodeling: ${products.map((p) => `${p.name} ($${p.price})`).join(', ')}. `
+      : '';
 
-  const analysisText = visionAnalysis
-    || (hasImage
-      ? 'Sube una foto clara para análisis con Claude Vision. Mientras tanto, comparamos tu consulta con proyectos reales de All In Remodeling en Georgia.'
-      : 'Cruzamos tu consulta con tendencias actuales y proyectos reales de cocinas y baños en Georgia.');
+  const serviceLine = services.map((s) => `${s.name} (${s.brand})`).join(' · ');
 
-  const blocks: DesignBlock[] = [
+  return [
     {
-      type: 'analysis',
-      title: hasImage ? 'Análisis visual (Claude Vision)' : 'Contexto del proyecto',
-      text: analysisText,
-      tags: hasImage ? ['análisis IA', 'foto del cliente'] : ['consulta'],
+      type: 'visual_analysis',
+      title: hasImage ? 'Análisis de tu espacio' : 'Evaluación inicial',
+      text:
+        visionAnalysis
+        || (hasImage
+          ? 'Sube una foto nítida para activar Claude Vision. Mientras tanto evaluamos tu consulta con nuestro catálogo.'
+          : `Analizamos tu consulta "${message.slice(0, 80)}" para alinearla con soluciones de cocina y baño en Georgia.`),
+      tags: ['Claude Vision', 'AI-DA'],
     },
-    ...portfolio.map((p) => ({
-      type: 'inspiration' as const,
-      title: p.title,
-      text: `${p.text} · ${p.location}`,
-      imageUrl: p.imageUrl,
-      source: 'All In Remodeling Portfolio',
-      tags: ['proyecto real', 'referencia'],
-    })),
-    ...trends.slice(0, 2).map((t) => ({
-      type: 'trend' as const,
-      title: t.title,
-      text: t.text,
-      imageUrl: t.imageUrl,
-      source: t.source,
-      tags: ['tendencia 2026'],
-    })),
     {
-      type: 'recommendation',
-      title: 'Propuesta All In Remodeling',
-      text: 'Agenda una consulta virtual o visita nuestro showroom en Georgia. Especialistas en cuarzo Calacatta, gabinetes premium y remodelaciones integrales.',
-      imageUrl: ALLIN_PORTFOLIO[1].imageUrl,
-      source: 'allinremodeling.us',
-      tags: ['cita', 'showroom'],
+      type: 'external_inspiration',
+      title: externalTrend.title,
+      text: `${externalTrend.text} Referencia de tendencia actual — mostrada aquí para que no tengas que salir del chat.`,
+      imageUrl: externalTrend.imageUrl,
+      source: externalTrend.source,
+      tags: ['tendencia', 'referencia web'],
+    },
+    {
+      type: 'ecosystem',
+      title: `${portfolioItem.title} + SmartSlab ${smartslab.name}`,
+      text: `${portfolioItem.text} · Proyecto real en ${portfolioItem.location}. Slab disponible: ${smartslab.name} (${smartslab.material}, ${smartslab.location}) desde $${smartslab.price}. ${productLine}Servicios: ${serviceLine}.`,
+      imageUrl: portfolioItem.imageUrl,
+      source: 'All In Remodeling · SmartSlab',
+      tags: ['portfolio', 'smartslab', 'productos'],
+    },
+    {
+      type: 'action_plan',
+      title: 'Tu plan con All In — listo para hablar con un asesor',
+      text: 'Te preparamos el camino para concretar tu remodelación. Un asesor puede retomar exactamente donde dejamos el chat.',
+      steps: buildActionPlanSteps(guest),
+      ctaLabel: guest ? 'Crear cuenta y agendar asesor' : 'Agendar consulta gratuita',
+      ctaType: guest ? 'estimate' : 'virtual',
+      tags: ['plan de acción', 'asesor'],
     },
   ];
-
-  return {
-    intro: 'Recomendaciones basadas en proyectos reales de All In Remodeling y tendencias de diseño interior.',
-    blocks,
-    products: [] as ProductRow[],
-    followUp: guest
-      ? 'Consulta express completada. Crea cuenta para más análisis y acceso a inventario.'
-      : '¿Agendamos una cita virtual o buscamos materiales en inventario?',
-  };
 }
 
-async function callOpenAI(
+function buildResponse(
   message: string,
-  imageBase64: string | undefined,
-  trendsContext: string,
-  portfolioContext: string,
+  hasImage: boolean,
+  guest: boolean,
   visionAnalysis: string,
+  trends: { title: string; text: string; imageUrl: string; source: string }[],
+  portfolio: (typeof ALLIN_PORTFOLIO),
+  smartslabListings: SmartSlabRow[],
   products: ProductRow[],
 ) {
-  const systemPrompt = `Eres el asistente de diseño de All In Remodeling (Atlanta, Georgia).
-Especialidad: gabinetes premium, cuarzo Calacatta, granito, vanidades y remodelaciones integrales.
+  const externalTrend = trends[0] || {
+    title: 'Tendencia 2026: Calacatta & Waterfall Islands',
+    text: 'Islas con cascada en cuarzo Calacatta y gabinetes shaker siguen liderando remodelaciones premium en Georgia.',
+    imageUrl: ALLIN_PORTFOLIO[1].imageUrl,
+    source: 'Industry trend',
+  };
 
-Responde SIEMPRE en español con JSON válido (sin markdown):
-{
-  "intro": "texto breve",
-  "blocks": [
-    {
-      "type": "analysis" | "trend" | "recommendation" | "inspiration",
-      "title": "...",
-      "text": "2-4 oraciones",
-      "imageUrl": "usa SOLO URLs del contexto de portfolio/tendencias",
-      "source": "fuente",
-      "tags": ["tag"]
-    }
-  ],
-  "products": [],
-  "followUp": "pregunta"
-}
+  const portfolioItem = portfolio[0] || ALLIN_PORTFOLIO[0];
+  const smartslab = smartslabListings[0];
+  const services = matchEcosystemServices(`${message} ${visionAnalysis}`, 3);
 
-Reglas:
-- Mínimo 4 blocks. El block "analysis" usa el análisis Claude Vision si existe.
-- Para imageUrl copia URLs exactas del contexto portfolio/tendencias (proyectos allinremodeling.us).
-- No uses unsplash ni URLs inventadas.
-- Personaliza recomendaciones según lo observado en la foto.
-- products déjalo vacío; el servidor lo completa.`;
+  const blocks = buildFourPillarBlocks(
+    message,
+    hasImage,
+    guest,
+    visionAnalysis,
+    externalTrend,
+    portfolioItem,
+    smartslab,
+    products,
+    services,
+  );
 
-  const userParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-    {
-      type: 'text',
-      text: `Consulta: ${message}
-
-${visionAnalysis ? `ANÁLISIS CLAUDE VISION (usar como base del block analysis):\n${visionAnalysis}\n` : ''}
-Proyectos reales All In Remodeling:
-${portfolioContext}
-
-Tendencias y referencias:
-${trendsContext}
-
-Inventario (${products.length}):
-${products.map((p) => `- ${p.name} (${p.sku}) $${p.price}`).join('\n') || 'Sin coincidencias'}`,
-    },
-  ];
-
-  if (imageBase64 && !visionAnalysis) {
-    userParts.unshift({ type: 'image_url', image_url: { url: imageBase64 } });
-  }
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o',
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userParts },
-      ],
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`OpenAI error: ${res.status}`);
-  }
-
-  const data = await res.json();
-  const parsed = JSON.parse(data.choices?.[0]?.message?.content);
-  parsed.products = products.length > 0 ? products : parsed.products || [];
-  return parsed;
+  return {
+    blocks,
+    products,
+    smartslabListings,
+    portfolioItem,
+    externalTrend,
+    services,
+  };
 }
 
 export default async (req: Request) => {
@@ -244,48 +236,40 @@ export default async (req: Request) => {
       visionAnalysis = await analyzeImageWithClaude(body.imageBase64, message);
     }
 
-    const trends = await searchDesignTrends(`${message} ${visionAnalysis}`.slice(0, 500));
-    const portfolio = matchPortfolio(`${message} ${visionAnalysis}`.slice(0, 500), 3);
-
-    const trendsContext = trends
-      .map((t, i) => `${i + 1}. ${t.title} | ${t.imageUrl} | (${t.source}): ${t.text}`)
-      .join('\n');
-
-    const portfolioContext = portfolio
-      .map((p, i) => `${i + 1}. ${p.title} | ${p.imageUrl} | ${p.location}: ${p.text}`)
-      .join('\n');
-
-    const referenceImages = [
-      ...portfolio.map((p) => ({ imageUrl: p.imageUrl, source: p.source })),
-      ...trends.map((t) => ({ imageUrl: t.imageUrl, source: t.source })),
-    ];
+    const contextQuery = `${message} ${visionAnalysis}`.slice(0, 500);
+    const [trends, portfolio, smartslabListings] = await Promise.all([
+      searchDesignTrends(contextQuery),
+      Promise.resolve(matchPortfolio(contextQuery, 2)),
+      searchSmartSlabListings(contextQuery, 3),
+    ]);
 
     const productQuery =
       message.match(/cuarzo|quartz|gabinete|cabinet|shaker|encimera|counter|calacatta/i)?.[0]
       || message.slice(0, 40);
     const products = await searchProducts(productQuery);
 
-    let response;
-    if (OPENAI_API_KEY && !OPENAI_API_KEY.includes('your-key')) {
-      response = await callOpenAI(
-        message,
-        body.imageBase64,
-        trendsContext,
-        portfolioContext,
-        visionAnalysis,
-        products,
-      );
-    } else {
-      response = buildMockResponse(message, hasImage, guest, visionAnalysis);
-      if (products.length > 0) response.products = products;
-    }
+    const built = buildResponse(
+      message,
+      hasImage,
+      guest,
+      visionAnalysis,
+      trends,
+      portfolio,
+      smartslabListings,
+      products,
+    );
 
-    response.blocks = enrichBlocksWithReferenceImages(response.blocks || [], referenceImages);
+    const { intro, followUp } = await polishIntroAndTexts(message, visionAnalysis, built.blocks);
 
-    if (guest && response.followUp) {
-      response.followUp =
-        'Modo invitado: esta consulta no se guarda. Crea cuenta para más análisis con Claude Vision.';
-    }
+    const response = {
+      intro,
+      blocks: built.blocks,
+      products: built.products,
+      smartslabListings: built.smartslabListings,
+      followUp: guest
+        ? 'Modo invitado: crea cuenta AI-DA para guardar este diseño y continuar con un asesor All In.'
+        : followUp,
+    };
 
     return new Response(JSON.stringify(response), { status: 200, headers });
   } catch (err) {
