@@ -19,9 +19,11 @@ import { cn } from '../lib/utils'
 import { sendChatMessage, getGuestMessageLimit } from '../lib/chatService'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
+import { BRAND, BRAND_COLORS } from '../lib/brand'
+import { BrandMark } from './BrandMark'
 
-const WELCOME_AUTH = 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nSube una foto, describe tu espacio o pregunta por tendencias. Te respondere con tarjetas visuales, referencias de diseno e inventario All In.'
-const WELCOME_GUEST = 'Consulta express gratuita: 1 pregunta sin cuenta.\n\nSube una foto de tu cocina o baño y recibe recomendaciones con tendencias actuales e imagenes de referencia.'
+const WELCOME_AUTH = `Bienvenido al asistente AI de ${BRAND.name}.\n\nSube una foto de tu cocina o baño para análisis con Claude Vision, tendencias de diseño y referencias de nuestros proyectos reales en Georgia.`
+const WELCOME_GUEST = `Consulta express gratuita · ${BRAND.tagline}\n\nSube una foto y recibe análisis visual + referencias de proyectos reales de All In Remodeling. Sin guardar historial.`
 
 export function ChatInterface({
   mode = 'authenticated',
@@ -225,10 +227,11 @@ export function ChatInterface({
             >
               <div className="p-4 border-b border-[#e5e5e5] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-[#111111] rounded-lg flex items-center justify-center">
-                    <Wand2 className="w-4 h-4 text-white" />
+                  <BrandMark size="sm" />
+                  <div>
+                    <span className="font-serif font-semibold text-sm text-[#1a1a1a] block leading-tight">{BRAND.shortName}</span>
+                    <span className="text-[10px] uppercase tracking-wider" style={{ color: BRAND_COLORS.accent }}>{BRAND.tagline}</span>
                   </div>
-                  <span className="font-semibold text-sm text-[#111111]">All In AI</span>
                 </div>
                 <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1.5 hover:bg-[#e8e8e8] rounded-lg">
                   <X className="w-4 h-4 text-[#6b6b6b]" />
@@ -267,13 +270,22 @@ export function ChatInterface({
               </div>
               <div className="p-3 border-t border-[#e5e5e5]">
                 <a
-                  href="https://allinremodeling.us"
+                  href={BRAND.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-2 text-xs text-[#6b6b6b] hover:text-[#111111] transition-colors"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   allinremodeling.us
+                </a>
+                <a
+                  href={BRAND.estimate}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2 text-xs transition-colors"
+                  style={{ color: BRAND_COLORS.accent }}
+                >
+                  Cotización gratis →
                 </a>
                 <button
                   onClick={() => onLogout?.()}
@@ -291,10 +303,11 @@ export function ChatInterface({
       {/* Desktop sidebar (always visible on lg+) */}
       <div className="hidden lg:flex w-[280px] border-r border-[#e5e5e5] bg-[#f5f5f5] flex-col">
         <div className="p-4 border-b border-[#e5e5e5] flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#111111] rounded-lg flex items-center justify-center">
-            <Wand2 className="w-4 h-4 text-white" />
+          <BrandMark size="sm" />
+          <div>
+            <span className="font-serif font-semibold text-sm text-[#1a1a1a] block leading-tight">{BRAND.shortName}</span>
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: BRAND_COLORS.accent }}>{BRAND.tagline}</span>
           </div>
-          <span className="font-semibold text-sm text-[#111111]">All In AI</span>
         </div>
         <div className="p-3">
           <button
@@ -329,13 +342,13 @@ export function ChatInterface({
         </div>
         <div className="p-3 border-t border-[#e5e5e5]">
           <a
-            href="https://allinremodeling.us"
+            href={BRAND.portfolio}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-2 text-xs text-[#6b6b6b] hover:text-[#111111] transition-colors"
           >
             <Wand2 className="w-3.5 h-3.5" />
-            allinremodeling.us
+            Ver portfolio
           </a>
         </div>
       </div>
@@ -373,7 +386,7 @@ export function ChatInterface({
               <Menu className="w-5 h-5 text-[#6b6b6b]" />
             </button>
             <h2 className="text-sm font-medium text-[#6b6b6b]">
-              {isGuest ? 'Consulta express · Invitado' : 'All In AI - Asistente de Diseno'}
+              {isGuest ? `Consulta express · ${BRAND.name}` : `${BRAND.name} · Design AI`}
             </h2>
             {isGuest && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
@@ -415,14 +428,17 @@ export function ChatInterface({
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full px-4">
               <div className="text-center max-w-lg">
-                <div className="w-16 h-16 bg-[#111111] rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Sparkles className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <BrandMark size="lg" />
                 </div>
-                <h1 className="text-3xl font-bold text-[#111111] mb-3">
-                  Asistente de Diseno AI
+                <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2 font-serif">
+                  {BRAND.name}
                 </h1>
+                <p className="text-xs tracking-[0.15em] uppercase mb-4" style={{ color: BRAND_COLORS.accent }}>
+                  {BRAND.tagline}
+                </p>
                 <p className="text-[#6b6b6b] text-lg mb-8 leading-relaxed">
-                  Sube una foto de tu cocina, describe tu espacio, o pregunta sobre gabinetes y cuarzo. Te ayudare a disenar tu remodelacion ideal.
+                  Sube una foto para análisis con Claude Vision. Referencias de cocinas y baños reales de Georgia.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                   {[

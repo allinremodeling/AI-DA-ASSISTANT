@@ -1,3 +1,5 @@
+import { ALLIN_PORTFOLIO, matchPortfolio } from './portfolio';
+
 export interface TrendReference {
   title: string;
   text: string;
@@ -8,46 +10,46 @@ export interface TrendReference {
 
 export const CURATED_TRENDS: TrendReference[] = [
   {
-    title: 'Warm Minimalism',
-    text: 'Cocinas con paletas neutras cálidas, madera natural y líneas limpias. Los gabinetes shaker en tonos greige y encimeras de cuarzo con vetas sutiles dominan las remodelaciones premium de 2026.',
-    imageUrl: 'https://images.unsplash.com/photo-1556911220-e15b29be4c00?w=800&q=80',
-    source: 'Trend Report 2026',
-    keywords: ['minimal', 'calido', 'warm', 'natural', 'shaker', 'neutro', 'moderno'],
+    title: 'Waterfall & Full-Height Backsplash',
+    text: 'Encimeras con cascada (waterfall) y backsplash de piedra continua — tendencia fuerte en cocinas premium de Georgia según proyectos All In.',
+    imageUrl: ALLIN_PORTFOLIO[1].imageUrl,
+    source: 'All In Remodeling · Alpharetta',
+    keywords: ['waterfall', 'backsplash', 'isla', 'cuarzo', 'premium'],
   },
   {
-    title: 'Two-Tone Cabinets',
-    text: 'Combinar gabinetes superiores claros con bases en navy, verde bosque o negro mate crea profundidad visual sin sobrecargar espacios compactos.',
-    imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80',
-    source: 'Houzz Trends',
-    keywords: ['two-tone', 'bicolor', 'navy', 'contraste', 'isla', 'color'],
+    title: 'Calacatta Quartz Islands',
+    text: 'Islas centrales en cuarzo Calacatta con vetas dramáticas. Combinación #1 en remodelaciones de Alpharetta y Lawrenceville.',
+    imageUrl: ALLIN_PORTFOLIO[1].imageUrl,
+    source: 'All In Remodeling Portfolio',
+    keywords: ['calacatta', 'cuarzo', 'quartz', 'isla', 'blanco', 'veta'],
   },
   {
-    title: 'Calacatta & Dramatic Veining',
-    text: 'El cuarzo Calacatta con vetas grises dramáticas sigue siendo la elección #1 para islas y áreas focal. Pairs bien con hardware negro mate.',
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
-    source: 'NKBA Inspiration',
-    keywords: ['cuarzo', 'quartz', 'calacatta', 'encimera', 'veta', 'granito', 'isla'],
+    title: 'Calacatta Gold Warmth',
+    text: 'Cuarzo Calacatta Gold aporta calidez sin perder elegancia. Ideal para transicionar cocinas tradicionales a look contemporáneo.',
+    imageUrl: ALLIN_PORTFOLIO[2].imageUrl,
+    source: 'All In Remodeling Portfolio',
+    keywords: ['gold', 'dorado', 'calacatta', 'shaker', 'moderno', 'calido'],
   },
   {
-    title: 'Integrated Lighting',
-    text: 'LED bajo gabinetes, perfiles empotrados y iluminación en capas transforman cocinas oscuras. Esencial cuando hay gabinetes de madera oscura.',
-    imageUrl: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80',
-    source: 'Lighting Design Weekly',
-    keywords: ['luz', 'iluminacion', 'led', 'oscuro', 'dark', 'madera'],
+    title: 'Golden Carrara Elegance',
+    text: 'Tonos Carrara con vetas suaves en cocinas de estilo clásico-renovado. Muy solicitado en proyectos residenciales de Georgia.',
+    imageUrl: ALLIN_PORTFOLIO[3].imageUrl,
+    source: 'All In Remodeling Portfolio',
+    keywords: ['carrara', 'marmol', 'marble', 'clasico', 'elegante'],
   },
   {
-    title: 'Spa-Inspired Bathrooms',
-    text: 'Baños tipo spa con azulejo grande formato, nichos iluminados, grifería negro mate y vanidades flotantes. Tendencia fuerte en remodelaciones de lujo.',
-    imageUrl: 'https://images.unsplash.com/photo-1600566753086-00f18fb576b9?w=800&q=80',
-    source: 'Bath Trends 2026',
-    keywords: ['bano', 'bath', 'spa', 'azulejo', 'vanidad', 'griferia'],
+    title: 'Spa Bathroom Vanities',
+    text: 'Vanidades flotantes con piedra premium, grifería negro mate y azulejo grande formato — estándar en baños tipo spa.',
+    imageUrl: ALLIN_PORTFOLIO[4].imageUrl,
+    source: 'All In Remodeling · Tennessee',
+    keywords: ['bano', 'bath', 'spa', 'vanidad', 'vanity', 'baño'],
   },
   {
-    title: 'Bold Hardware',
-    text: 'Tiradores negro mate, dorado cepillado o latón envejecido actualizan cocinas tradicionales sin cambiar gabinetes completos.',
-    imageUrl: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800&q=80',
-    source: 'Design Milk',
-    keywords: ['hardware', 'tirador', 'negro', 'mate', 'dorado', 'laton', 'actualizar'],
+    title: 'Full Kitchen Transformations',
+    text: 'Remodelación integral: gabinetes nuevos + encimeras de piedra + iluminación en capas. Máximo ROI en reventa.',
+    imageUrl: ALLIN_PORTFOLIO[0].imageUrl,
+    source: 'All In Remodeling Portfolio',
+    keywords: ['remodel', 'cocina', 'integral', 'transform', 'kitchen'],
   },
 ];
 
@@ -79,14 +81,21 @@ export function matchCuratedTrends(query: string, limit = 4): TrendReference[] {
   return CURATED_TRENDS.slice(0, limit);
 }
 
-interface TavilyResult {
+interface TrendResult {
   title: string;
   text: string;
   imageUrl: string;
   source: string;
 }
 
-export async function searchDesignTrends(query: string): Promise<TavilyResult[]> {
+export async function searchDesignTrends(query: string): Promise<TrendResult[]> {
+  const portfolioFirst = matchPortfolio(query, 2).map((p) => ({
+    title: p.title,
+    text: p.text,
+    imageUrl: p.imageUrl,
+    source: p.source,
+  }));
+
   const apiKey = process.env.TAVILY_API_KEY;
   if (apiKey) {
     try {
@@ -95,31 +104,39 @@ export async function searchDesignTrends(query: string): Promise<TavilyResult[]>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           api_key: apiKey,
-          query: `${query} kitchen bathroom interior design trends 2026`,
+          query: `${query} kitchen bathroom interior design trends 2026 site:houzz.com OR site:architecturaldigest.com OR site:allinremodeling.us`,
           search_depth: 'basic',
           include_images: true,
-          max_results: 5,
+          max_results: 4,
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        const results = (data.results || []).map((r: { title: string; content: string; url: string; images?: string[] }) => ({
-          title: r.title,
-          text: r.content?.slice(0, 400) || '',
-          imageUrl: r.images?.[0] || CURATED_TRENDS[0].imageUrl,
-          source: new URL(r.url).hostname.replace('www.', ''),
-        }));
-        if (results.length > 0) return results;
+        const webResults = (data.results || []).map(
+          (r: { title: string; content: string; url: string; images?: string[] }) => ({
+            title: r.title,
+            text: r.content?.slice(0, 400) || '',
+            imageUrl: r.images?.[0] || matchPortfolio(query, 1)[0]?.imageUrl || ALLIN_PORTFOLIO[0].imageUrl,
+            source: new URL(r.url).hostname.replace('www.', ''),
+          }),
+        );
+        if (webResults.length > 0) {
+          return [...portfolioFirst, ...webResults].slice(0, 5);
+        }
       }
     } catch {
-      // fall through to curated
+      // fall through
     }
   }
 
-  return matchCuratedTrends(query).map((t) => ({
+  const curated = matchCuratedTrends(query).map((t) => ({
     title: t.title,
     text: t.text,
     imageUrl: t.imageUrl,
     source: t.source,
   }));
+
+  return [...portfolioFirst, ...curated].slice(0, 5);
 }
+
+export { matchPortfolio, ALLIN_PORTFOLIO };

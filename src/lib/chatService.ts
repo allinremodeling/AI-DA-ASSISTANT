@@ -1,4 +1,5 @@
 import type { ChatMessage, StructuredChatResponse } from './types';
+import { matchPortfolio, ALLIN_PORTFOLIO } from './portfolio';
 
 const CHAT_API = '/.netlify/functions/chat';
 const GUEST_MESSAGE_LIMIT = 1;
@@ -48,7 +49,7 @@ export async function sendChatMessage(
     };
   }
 
-  onProgress?.('Buscando tendencias de diseño...');
+  onProgress?.('Analizando foto con Claude Vision...');
 
   try {
     const res = await fetch(CHAT_API, {
@@ -76,6 +77,9 @@ export async function sendChatMessage(
 }
 
 function buildLocalMockResponse(content: string, hasImage: boolean, guest: boolean): ChatMessage {
+  const portfolio = matchPortfolio(content, 3);
+  const p = (i: number) => portfolio[i]?.imageUrl || ALLIN_PORTFOLIO[i % ALLIN_PORTFOLIO.length].imageUrl;
+
   const isLayout = /\d+/.test(content) && /pulgada|inch|layout|medida|dimension/i.test(content);
   const isProduct = /producto|cuarzo|gabinete|shaker|quartz|cabinet|buscar|inventario/i.test(content);
 
@@ -95,22 +99,22 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
             : w >= 120
               ? 'Layout en L con opción de isla compacta 30"×48" si el flujo lo permite.'
               : 'Layout lineal o L compacto; isla no recomendada por espacio limitado.',
-          imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80',
+          imageUrl: p(0),
           tags: ['layout', 'medidas'],
         },
         {
           type: 'trend',
-          title: 'Tendencia: Work Triangle 2.0',
-          text: 'Los diseñadores priorizan zonas (prep, cook, clean) sobre triángulo clásico. Integra almacenamiento vertical y LED bajo gabinete.',
-          imageUrl: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80',
-          source: 'NKBA 2026',
-          tags: ['tendencia'],
+          title: 'Referencia All In — Calacatta Alpharetta',
+          text: 'Proyecto real con isla Calacatta en Alpharetta, GA. Referencia ideal para layouts con isla central.',
+          imageUrl: p(1),
+          source: 'All In Remodeling Portfolio',
+          tags: ['proyecto real'],
         },
         {
           type: 'recommendation',
           title: 'Estimación de materiales',
           text: `${Math.ceil(w / 24)} gabinetes base, ${Math.ceil(w / 30)} gabinetes wall, encimera cuarzo ${w >= 120 ? '96"' : '72"'}. Presupuesto orientativo: $${(Math.ceil(w / 24) * 300 + 1500).toLocaleString()}.`,
-          imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
+          imageUrl: p(2),
           tags: ['presupuesto'],
         },
       ],
@@ -126,18 +130,18 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
       blocks: [
         {
           type: 'trend',
-          title: 'White Shaker + Calacatta',
-          text: 'La combinación más vendida: gabinetes shaker blancos con cuarzo vetas grises. Funciona en cocinas tradicionales y modernas.',
-          imageUrl: 'https://images.unsplash.com/photo-1556911220-e15b0be4e00c?w=800&q=80',
-          source: 'All In Catalog',
+          title: portfolio[0]?.title || 'Calacatta Quartz',
+          text: portfolio[0]?.text || 'Cuarzo Calacatta — bestseller All In Remodeling.',
+          imageUrl: p(0),
+          source: 'All In Remodeling Portfolio',
           tags: ['bestseller'],
         },
         {
           type: 'inspiration',
-          title: 'Navy Island Accent',
-          text: 'Isla en navy con encimera clara: tendencia 2026 para añadir contraste sin pintar toda la cocina.',
-          imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80',
-          source: 'Houzz Trends',
+          title: portfolio[1]?.title || 'Golden Carrara',
+          text: portfolio[1]?.text || 'Referencia de cocina con piedra cálida.',
+          imageUrl: p(1),
+          source: 'All In Remodeling Portfolio',
           tags: ['inspiración'],
         },
       ],
@@ -152,35 +156,27 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
     blocks: [
       {
         type: 'analysis',
-        title: hasImage ? 'Lo que vemos en tu foto' : 'Tu consulta',
+        title: hasImage ? 'Análisis visual' : 'Tu consulta',
         text: hasImage
-          ? 'Gabinetes de tono oscuro con encimeras claras. Oportunidad: iluminación en capas y cambio a shaker claro para ampliar visualmente el espacio.'
-          : 'Cruzamos tu idea con referencias de cocinas y baños premium en EE.UU.',
-        imageUrl: hasImage ? undefined : 'https://images.unsplash.com/photo-1556911220-e15b0be4e00c?w=800&q=80',
+          ? 'Conecta a Netlify con ANTHROPIC_API_KEY para análisis Claude Vision en producción. Referencias basadas en portfolio All In.'
+          : 'Referencias de cocinas y baños reales de All In Remodeling en Georgia.',
         tags: ['análisis'],
       },
-      {
-        type: 'trend',
-        title: 'Warm Minimalism 2026',
-        text: 'Paletas cálidas, madera natural y cuarzo con vetas sutiles. Reemplaza granito oscuro por Calacatta o Arabescato.',
-        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
-        source: 'Architectural Digest',
-        tags: ['tendencia'],
-      },
-      {
-        type: 'trend',
-        title: 'Integrated LED Lighting',
-        text: 'Perfiles LED bajo gabinete y en estantes abiertos. Esencial si mantienes madera oscura en bases.',
-        imageUrl: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80',
-        source: 'Lighting Design Weekly',
-        tags: ['iluminación'],
-      },
+      ...portfolio.slice(0, 3).map((item) => ({
+        type: 'inspiration' as const,
+        title: item.title,
+        text: `${item.text} · ${item.location}`,
+        imageUrl: item.imageUrl,
+        source: 'All In Remodeling Portfolio',
+        tags: ['proyecto real'],
+      })),
       {
         type: 'recommendation',
-        title: 'Propuesta All In',
-        text: 'White Shaker (CAB-001–005) + Cuarzo Calacatta (QZ-001) + hardware negro mate. Transformación de alto impacto con ROI fuerte en reventa.',
-        imageUrl: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800&q=80',
-        tags: ['recomendación'],
+        title: 'Agenda con All In Remodeling',
+        text: 'Consulta virtual o visita al showroom. Especialistas en cuarzo, gabinetes y remodelaciones integrales en Georgia.',
+        imageUrl: ALLIN_PORTFOLIO[0].imageUrl,
+        source: 'allinremodeling.us',
+        tags: ['cita'],
       },
     ],
     followUp: guest

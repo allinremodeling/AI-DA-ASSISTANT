@@ -1,4 +1,6 @@
-import { matchCuratedTrends, searchDesignTrends } from './lib/trends';
+import { matchCuratedTrends, searchDesignTrends, matchPortfolio } from './lib/trends';
+import { analyzeImageWithClaude } from './lib/vision';
+import { ALLIN_PORTFOLIO } from './lib/portfolio';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -11,6 +13,15 @@ interface ChatRequest {
   message: string;
   imageBase64?: string;
   guest?: boolean;
+}
+
+interface DesignBlock {
+  type: string;
+  title: string;
+  text: string;
+  imageUrl?: string;
+  source?: string;
+  tags?: string[];
 }
 
 interface ProductRow {
@@ -54,20 +65,55 @@ async function searchProducts(query: string): Promise<ProductRow[]> {
   return res.json();
 }
 
-function buildMockResponse(message: string, hasImage: boolean, guest: boolean) {
-  const trends = matchCuratedTrends(message, 3);
+function enrichBlocksWithReferenceImages(
+  blocks: DesignBlock[],
+  referenceImages: { imageUrl: string; source: string }[],
+): DesignBlock[] {
+  let refIndex = 0;
+  return blocks.map((block) => {
+    if (block.type === 'analysis') return block;
+    if (block.imageUrl?.includes('unsplash.com')) {
+      const ref = referenceImages[refIndex++ % referenceImages.length];
+      return { ...block, imageUrl: ref.imageUrl, source: block.source || ref.source };
+    }
+    if (!block.imageUrl && referenceImages.length > 0) {
+      const ref = referenceImages[refIndex++ % referenceImages.length];
+      return { ...block, imageUrl: ref.imageUrl, source: block.source || ref.source };
+    }
+    return block;
+  });
+}
 
-  const blocks = [
+function buildMockResponse(
+  message: string,
+  hasImage: boolean,
+  guest: boolean,
+  visionAnalysis: string,
+) {
+  const trends = matchCuratedTrends(message, 3);
+  const portfolio = matchPortfolio(message, 2);
+
+  const analysisText = visionAnalysis
+    || (hasImage
+      ? 'Sube una foto clara para análisis con Claude Vision. Mientras tanto, comparamos tu consulta con proyectos reales de All In Remodeling en Georgia.'
+      : 'Cruzamos tu consulta con tendencias actuales y proyectos reales de cocinas y baños en Georgia.');
+
+  const blocks: DesignBlock[] = [
     {
-      type: 'analysis' as const,
-      title: hasImage ? 'Análisis de tu espacio' : 'Contexto del proyecto',
-      text: hasImage
-        ? 'Detectamos una cocina con gabinetes de madera oscura y encimeras claras. La iluminación natural es moderada; conviene reforzar con LED bajo gabinete y pendientes sobre la zona de trabajo.'
-        : 'Basándonos en tu consulta, cruzamos tendencias actuales de remodelación con soluciones aplicables a cocinas y baños residenciales.',
-      imageUrl: hasImage ? undefined : trends[0]?.imageUrl,
-      tags: hasImage ? ['análisis visual', 'iluminación'] : ['consulta'],
+      type: 'analysis',
+      title: hasImage ? 'Análisis visual (Claude Vision)' : 'Contexto del proyecto',
+      text: analysisText,
+      tags: hasImage ? ['análisis IA', 'foto del cliente'] : ['consulta'],
     },
-    ...trends.map((t) => ({
+    ...portfolio.map((p) => ({
+      type: 'inspiration' as const,
+      title: p.title,
+      text: `${p.text} · ${p.location}`,
+      imageUrl: p.imageUrl,
+      source: 'All In Remodeling Portfolio',
+      tags: ['proyecto real', 'referencia'],
+    })),
+    ...trends.slice(0, 2).map((t) => ({
       type: 'trend' as const,
       title: t.title,
       text: t.text,
@@ -76,66 +122,79 @@ function buildMockResponse(message: string, hasImage: boolean, guest: boolean) {
       tags: ['tendencia 2026'],
     })),
     {
-      type: 'recommendation' as const,
+      type: 'recommendation',
       title: 'Propuesta All In Remodeling',
-      text: 'Combina gabinetes White Shaker con cuarzo Calacatta y hardware negro mate. Esta mezcla amplía visualmente el espacio y alinea tu proyecto con las tendencias más buscadas este año.',
-      imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
-      tags: ['gabinetes', 'cuarzo'],
+      text: 'Agenda una consulta virtual o visita nuestro showroom en Georgia. Especialistas en cuarzo Calacatta, gabinetes premium y remodelaciones integrales.',
+      imageUrl: ALLIN_PORTFOLIO[1].imageUrl,
+      source: 'allinremodeling.us',
+      tags: ['cita', 'showroom'],
     },
   ];
 
   return {
-    intro: 'Aquí tienes un análisis con referencias de diseño actuales y recomendaciones personalizadas.',
+    intro: 'Recomendaciones basadas en proyectos reales de All In Remodeling y tendencias de diseño interior.',
     blocks,
-    products: [],
+    products: [] as ProductRow[],
     followUp: guest
-      ? '¿Quieres guardar este diseño? Crea una cuenta gratis para continuar la conversación.'
-      : '¿Quieres que busquemos estos materiales en nuestro inventario o generemos un render conceptual?',
+      ? 'Consulta express completada. Crea cuenta para más análisis y acceso a inventario.'
+      : '¿Agendamos una cita virtual o buscamos materiales en inventario?',
   };
 }
 
-async function callOpenAI(message: string, imageBase64: string | undefined, trendsContext: string, products: ProductRow[]) {
-  const systemPrompt = `Eres el asistente de diseño de All In Remodeling (cocinas y baños).
-Responde SIEMPRE en español con JSON válido (sin markdown) usando este esquema:
+async function callOpenAI(
+  message: string,
+  imageBase64: string | undefined,
+  trendsContext: string,
+  portfolioContext: string,
+  visionAnalysis: string,
+  products: ProductRow[],
+) {
+  const systemPrompt = `Eres el asistente de diseño de All In Remodeling (Atlanta, Georgia).
+Especialidad: gabinetes premium, cuarzo Calacatta, granito, vanidades y remodelaciones integrales.
+
+Responde SIEMPRE en español con JSON válido (sin markdown):
 {
-  "intro": "texto breve de apertura",
+  "intro": "texto breve",
   "blocks": [
     {
       "type": "analysis" | "trend" | "recommendation" | "inspiration",
-      "title": "título del bloque",
-      "text": "2-4 oraciones útiles",
-      "imageUrl": "URL de imagen si aplica",
-      "source": "fuente opcional",
-      "tags": ["tag1", "tag2"]
+      "title": "...",
+      "text": "2-4 oraciones",
+      "imageUrl": "usa SOLO URLs del contexto de portfolio/tendencias",
+      "source": "fuente",
+      "tags": ["tag"]
     }
   ],
   "products": [],
-  "followUp": "pregunta de cierre"
+  "followUp": "pregunta"
 }
 
 Reglas:
-- Incluye mínimo 3 blocks; al menos 2 deben tener imageUrl.
-- Usa las tendencias de referencia proporcionadas; cita la source cuando venga de internet.
-- Mezcla tendencias globales con recomendaciones prácticas (no solo SKUs).
-- Si hay imagen del usuario, el primer block type=analysis describe lo observado.
-- products déjalo vacío; el servidor lo completa.
-- Sé conciso y visual; evita listas largas con asteriscos.`;
+- Mínimo 4 blocks. El block "analysis" usa el análisis Claude Vision si existe.
+- Para imageUrl copia URLs exactas del contexto portfolio/tendencias (proyectos allinremodeling.us).
+- No uses unsplash ni URLs inventadas.
+- Personaliza recomendaciones según lo observado en la foto.
+- products déjalo vacío; el servidor lo completa.`;
 
-  const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+  const userParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
     {
       type: 'text',
       text: `Consulta: ${message}
 
-Tendencias de referencia (internet):
+${visionAnalysis ? `ANÁLISIS CLAUDE VISION (usar como base del block analysis):\n${visionAnalysis}\n` : ''}
+Proyectos reales All In Remodeling:
+${portfolioContext}
+
+Tendencias y referencias:
 ${trendsContext}
 
-Productos del inventario All In (${products.length}):
-${products.map((p) => `- ${p.name} (${p.sku}) $${p.price}`).join('\n') || 'Sin coincidencias directas'}`,
+Inventario (${products.length}):
+${products.map((p) => `- ${p.name} (${p.sku}) $${p.price}`).join('\n') || 'Sin coincidencias'}`,
     },
   ];
 
-  if (imageBase64) {
-    userContent.unshift({ type: 'image_url', image_url: { url: imageBase64 } });
+  if (imageBase64 && !visionAnalysis) {
+    userParts.unshift({ type: 'image_url', image_url: { url: imageBase64 } });
   }
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -145,13 +204,13 @@ ${products.map((p) => `- ${p.name} (${p.sku}) $${p.price}`).join('\n') || 'Sin c
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
+        { role: 'user', content: userParts },
       ],
-      max_tokens: 1800,
+      max_tokens: 2000,
     }),
   });
 
@@ -160,8 +219,7 @@ ${products.map((p) => `- ${p.name} (${p.sku}) $${p.price}`).join('\n') || 'Sin c
   }
 
   const data = await res.json();
-  const raw = data.choices?.[0]?.message?.content;
-  const parsed = JSON.parse(raw);
+  const parsed = JSON.parse(data.choices?.[0]?.message?.content);
   parsed.products = products.length > 0 ? products : parsed.products || [];
   return parsed;
 }
@@ -181,24 +239,52 @@ export default async (req: Request) => {
     const hasImage = Boolean(body.imageBase64);
     const guest = Boolean(body.guest);
 
-    const trends = await searchDesignTrends(message);
+    let visionAnalysis = '';
+    if (body.imageBase64) {
+      visionAnalysis = await analyzeImageWithClaude(body.imageBase64, message);
+    }
+
+    const trends = await searchDesignTrends(`${message} ${visionAnalysis}`.slice(0, 500));
+    const portfolio = matchPortfolio(`${message} ${visionAnalysis}`.slice(0, 500), 3);
+
     const trendsContext = trends
-      .map((t, i) => `${i + 1}. ${t.title} (${t.source}): ${t.text}`)
+      .map((t, i) => `${i + 1}. ${t.title} | ${t.imageUrl} | (${t.source}): ${t.text}`)
       .join('\n');
 
-    const productQuery = message.match(/cuarzo|quartz|gabinete|cabinet|shaker|encimera|counter/i)?.[0] || message.slice(0, 40);
+    const portfolioContext = portfolio
+      .map((p, i) => `${i + 1}. ${p.title} | ${p.imageUrl} | ${p.location}: ${p.text}`)
+      .join('\n');
+
+    const referenceImages = [
+      ...portfolio.map((p) => ({ imageUrl: p.imageUrl, source: p.source })),
+      ...trends.map((t) => ({ imageUrl: t.imageUrl, source: t.source })),
+    ];
+
+    const productQuery =
+      message.match(/cuarzo|quartz|gabinete|cabinet|shaker|encimera|counter|calacatta/i)?.[0]
+      || message.slice(0, 40);
     const products = await searchProducts(productQuery);
 
     let response;
     if (OPENAI_API_KEY && !OPENAI_API_KEY.includes('your-key')) {
-      response = await callOpenAI(message, body.imageBase64, trendsContext, products);
+      response = await callOpenAI(
+        message,
+        body.imageBase64,
+        trendsContext,
+        portfolioContext,
+        visionAnalysis,
+        products,
+      );
     } else {
-      response = buildMockResponse(message, hasImage, guest);
+      response = buildMockResponse(message, hasImage, guest, visionAnalysis);
       if (products.length > 0) response.products = products;
     }
 
+    response.blocks = enrichBlocksWithReferenceImages(response.blocks || [], referenceImages);
+
     if (guest && response.followUp) {
-      response.followUp = 'Modo invitado: esta consulta no se guarda. Crea cuenta para continuar explorando diseños.';
+      response.followUp =
+        'Modo invitado: esta consulta no se guarda. Crea cuenta para más análisis con Claude Vision.';
     }
 
     return new Response(JSON.stringify(response), { status: 200, headers });

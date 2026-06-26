@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import type { DesignBlock, Product } from '../lib/types';
+import { BRAND, BRAND_COLORS } from '../lib/brand';
 
 export function AssistantMessageBody({
   intro,
@@ -67,13 +68,22 @@ function DesignBlockCard({ block }: { block: DesignBlock }) {
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <h4 className="text-sm font-semibold text-[#111111]">{block.title}</h4>
-          <span className="text-[10px] uppercase tracking-wide text-[#999999] shrink-0">
+          <span
+            className="text-[10px] uppercase tracking-wide shrink-0 px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: '#faf8f3', color: BRAND_COLORS.accent }}
+          >
             {block.type}
           </span>
         </div>
         <p className="text-xs text-[#6b6b6b] leading-relaxed">{block.text}</p>
         {block.source && (
-          <p className="text-[10px] text-[#999999]">Fuente: {block.source}</p>
+          <p className="text-[10px] text-[#999999]">
+            Fuente: {block.source.includes('allinremodeling') ? (
+              <a href={BRAND.portfolio} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: BRAND_COLORS.accent }}>
+                {block.source}
+              </a>
+            ) : block.source}
+          </p>
         )}
         {block.tags && block.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">

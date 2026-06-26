@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Wand2, Loader2 } from 'lucide-react'
+import { Loader2, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
+import { BRAND, BRAND_COLORS } from '../lib/brand'
+import { BrandHeader } from './BrandMark'
 
 export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -32,22 +34,16 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
   return (
     <div className="h-screen w-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-[#111111] rounded-2xl flex items-center justify-center mb-4">
-            <Wand2 className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-[#111111]">All In AI</h1>
-          <p className="text-sm text-[#6b6b6b] mt-1">Asistente de Diseño</p>
-        </div>
+        <BrandHeader />
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3 mt-8">
           <input
             type="email"
             placeholder="Correo electrónico"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-3 bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl text-sm text-[#111111] placeholder-[#999999] focus:outline-none focus:border-[#111111] transition-colors"
+            className="w-full px-4 py-3 bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl text-sm text-[#111111] placeholder-[#999999] focus:outline-none focus:border-[#b8952f] transition-colors"
           />
           <input
             type="password"
@@ -56,15 +52,11 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full px-4 py-3 bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl text-sm text-[#111111] placeholder-[#999999] focus:outline-none focus:border-[#111111] transition-colors"
+            className="w-full px-4 py-3 bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl text-sm text-[#111111] placeholder-[#999999] focus:outline-none focus:border-[#b8952f] transition-colors"
           />
 
-          {error && (
-            <p className="text-xs text-red-500 px-1">{error}</p>
-          )}
-          {success && (
-            <p className="text-xs text-green-600 px-1">{success}</p>
-          )}
+          {error && <p className="text-xs text-red-500 px-1">{error}</p>}
+          {success && <p className="text-xs text-green-600 px-1">{success}</p>}
 
           <button
             type="submit"
@@ -73,8 +65,9 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
               'w-full py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2',
               loading
                 ? 'bg-[#e5e5e5] text-[#999999] cursor-not-allowed'
-                : 'bg-[#111111] text-white hover:bg-[#333333]',
+                : 'text-white hover:opacity-90',
             )}
+            style={loading ? undefined : { backgroundColor: BRAND_COLORS.primary }}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {mode === 'signin' ? 'Iniciar sesión' : 'Crear cuenta'}
@@ -85,17 +78,29 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
           <button
             type="button"
             onClick={onGuest}
-            className="w-full mt-3 py-3 rounded-xl text-sm font-medium border border-[#e5e5e5] text-[#111111] hover:bg-[#f9f9f9] transition-colors"
+            className="w-full mt-3 py-3 rounded-xl text-sm font-medium border transition-colors hover:bg-[#faf8f3]"
+            style={{ borderColor: BRAND_COLORS.accent, color: BRAND_COLORS.primary }}
           >
             Consulta express sin cuenta
           </button>
         )}
 
+        <div className="mt-6 flex flex-col items-center gap-2 text-xs" style={{ color: BRAND_COLORS.muted }}>
+          <a href={`tel:${BRAND.phoneRaw}`} className="inline-flex items-center gap-1 hover:text-[#1a1a1a]">
+            <Phone className="w-3 h-3" />
+            {BRAND.phone}
+          </a>
+          <a href={BRAND.website} target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1a1a]">
+            {BRAND.website.replace('https://', '')}
+          </a>
+        </div>
+
         <p className="text-center text-xs text-[#6b6b6b] mt-6">
           {mode === 'signin' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
           <button
             onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
-            className="text-[#111111] font-medium underline underline-offset-2"
+            className="font-medium underline underline-offset-2"
+            style={{ color: BRAND_COLORS.accent }}
           >
             {mode === 'signin' ? 'Crear cuenta' : 'Iniciar sesión'}
           </button>
