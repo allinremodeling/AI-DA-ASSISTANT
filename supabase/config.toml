@@ -1,2 +1,5 @@
 [functions.buscar-productos-woocommerce]
 verify_jwt = false
+
+[functions.chat]
+verify_jwt = false

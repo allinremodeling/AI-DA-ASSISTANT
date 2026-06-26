@@ -2,7 +2,11 @@ import type { ChatMessage, StructuredChatResponse } from './types';
 import { matchPortfolio, ALLIN_PORTFOLIO } from './portfolio';
 import { ECOSYSTEM } from './brand';
 
-const CHAT_API = '/.netlify/functions/chat';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const CHAT_API =
+  (import.meta.env.VITE_CHAT_API_URL as string | undefined)
+  || (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/chat` : '/.netlify/functions/chat');
 const GUEST_MESSAGE_LIMIT = 1;
 
 export function getGuestMessageLimit(): number {
@@ -56,7 +60,12 @@ export async function sendChatMessage(
   try {
     const res = await fetch(CHAT_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(SUPABASE_ANON_KEY
+          ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
+          : {}),
+      },
       body: JSON.stringify({
         message: content,
         imageBase64,
@@ -84,13 +93,13 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
   const p1 = portfolio[1] || ALLIN_PORTFOLIO[2];
 
   return structuredToMessage({
-    intro: 'Consulta AI-DA (modo demo local). En producción Netlify conecta Claude Vision, SmartSlab y el ecosistema All In.',
+    intro: 'Consulta AI-DA (modo demo local). En producción Supabase conecta Claude Vision, SmartSlab y el ecosistema All In.',
     blocks: [
       {
         type: 'visual_analysis',
         title: hasImage ? 'Análisis visual' : 'Evaluación inicial',
         text: hasImage
-          ? 'Activa ANTHROPIC_API_KEY en Netlify para análisis Claude Vision de tu foto.'
+          ? 'Activa ANTHROPIC_API_KEY en Supabase secrets para análisis Claude Vision de tu foto.'
           : content.slice(0, 200),
         tags: ['AI-DA'],
       },

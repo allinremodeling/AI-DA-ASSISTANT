@@ -33,17 +33,78 @@ Objetivo: dejar al usuario **listo para hablar con un asesor** y concretar la re
 
 ---
 
-## Variables de entorno (Netlify)
+## Arquitectura (cPanel + Supabase)
+
+| Capa | Dónde | Qué hace |
+|------|-------|----------|
+| **Frontend** | cPanel `public_html/ai/` | React SPA en `allinremodeling.us/ai` |
+| **Chat API** | Supabase Edge Function `chat` | Claude Vision, tendencias, SmartSlab, productos |
+| **Auth** | Supabase Auth | Login / registro usuarios AI-DA |
+
+El frontend **no** lleva API keys de OpenAI/Anthropic — solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
+
+---
+
+## Variables de entorno
+
+### Cliente (`.env.local` — solo públicas, van al build de cPanel)
 
 | Variable | Descripción |
 |----------|-------------|
+| `VITE_SUPABASE_URL` | URL del proyecto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Anon key (auth + llamada a Edge Functions) |
+| `VITE_CHAT_API_URL` | Opcional — override de la URL del chat |
+
+### Supabase secrets (`supabase secrets set ...`)
+
+| Secret | Descripción |
+|--------|-------------|
 | `ANTHROPIC_API_KEY` | Claude Vision — análisis de fotos |
 | `OPENAI_API_KEY` | Copy y personalización de textos |
-| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Auth cliente |
-| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Productos All In Remodeling |
+| `TAVILY_API_KEY` | Búsqueda web de tendencias (opcional) |
 | `SMARTSLAB_SUPABASE_URL` / `SMARTSLAB_SUPABASE_SECRET_KEY` | Listings SmartSlab (opcional) |
 | `SMARTSLAB_API_URL` | API alternativa (default: smart-slab-app.vercel.app) |
-| `TAVILY_API_KEY` | Búsqueda web de tendencias (opcional) |
+
+Los productos WooCommerce usan la conexión admin del mismo proyecto Supabase (`products`).
+
+---
+
+## Deploy cPanel + Supabase
+
+### 1. Secrets y Edge Function
+
+```bash
+supabase login
+supabase link --project-ref TU_PROJECT_REF
+
+supabase secrets set \
+  ANTHROPIC_API_KEY=sk-ant-... \
+  OPENAI_API_KEY=sk-... \
+  TAVILY_API_KEY=tvly-...
+
+supabase functions deploy chat
+```
+
+La función queda en: `https://TU_PROJECT.supabase.co/functions/v1/chat`  
+(`verify_jwt = false` — acceso invitado + usuarios con anon key.)
+
+### 2. Build frontend para `/ai/`
+
+```powershell
+# .env.local
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+
+npm install
+npm run build:cpanel
+```
+
+Sube **todo el contenido** de `dist/` a `public_html/ai/` (incluye `.htaccess` para SPA).
+
+### 3. Verificar
+
+- `https://allinremodeling.us/ai/` carga la app
+- En DevTools → Network, `POST .../functions/v1/chat` responde 200 con JSON `blocks[]`
 
 ---
 
@@ -52,14 +113,20 @@ Objetivo: dejar al usuario **listo para hablar con un asesor** y concretar la re
 ```bash
 npm install
 npm run dev
-npm run build            # Netlify (base /)
-npm run build:cpanel     # cPanel /ai/
-npx netlify dev          # Frontend + functions
+npm run build            # Netlify legacy (base /)
+npm run build:cpanel     # cPanel allinremodeling.us/ai/
+npx netlify dev          # Solo si usas Netlify functions en local
 ```
 
 ---
 
 ## Changelog
+
+### v1.4.0 — 2026-06-25
+
+- Chat API migrado a **Supabase Edge Function** (`functions/chat`)
+- Frontend en cPanel `allinremodeling.us/ai` llama a Supabase (sin Netlify Functions)
+- Secrets de IA en Supabase, no en el build del cliente
 
 ### v1.3.0 — 2026-06-26
 

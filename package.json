@@ -1,12 +1,13 @@
 {
   "name": "project",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:cpanel": "tsc -b && vite build --base /ai/",
+    "deploy:chat": "supabase functions deploy chat",
     "lint": "oxlint",
     "preview": "vite preview",
     "db:push": "drizzle-kit push",
