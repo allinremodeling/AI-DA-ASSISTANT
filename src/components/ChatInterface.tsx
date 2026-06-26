@@ -148,14 +148,16 @@ export function ChatInterface({
     setInput('')
     setImagePreview(null)
     setIsLoading(true)
-    setLoadingText('Analizando...')
+    setLoadingText('🔎 Analizando tu proyecto...')
+
+    const userLang = navigator.language.slice(0, 2).toLowerCase()
 
     const response = await sendChatMessage(
       threadId,
       userMessage.content,
       imagePreview || undefined,
       (status) => setLoadingText(status),
-      { guest: isGuest, userMessageCount: guestUserMessages },
+      { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang },
     )
 
     const final = [...updated, response]

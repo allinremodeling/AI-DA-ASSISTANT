@@ -19,6 +19,7 @@ export interface OrchestratorContext {
   message: string;
   guest: boolean;
   hasImage: boolean;
+  lang: string;
   visionAnalysis: string;
   searchDate: string;
   dimensions: ProjectDimensions;
@@ -79,32 +80,38 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
     },
     {
       type: 'action_plan',
-      title: 'Plan with All In — talk to an advisor',
-      text: 'Steps to move forward with our team.',
-      steps: buildActionPlanSteps(ctx.guest),
-      ctaLabel: ctx.guest ? 'Create account & schedule' : 'Schedule free consultation',
+      title: ctx.lang === 'es' ? 'Plan con All In — hablar con un asesor' : 'Plan with All In — talk to an advisor',
+      text: ctx.lang === 'es' ? 'Pasos para concretar tu remodelación con nuestro equipo.' : 'Steps to move forward with our team.',
+      steps: buildActionPlanSteps(ctx.guest, ctx.lang),
+      ctaLabel: ctx.guest
+        ? (ctx.lang === 'es' ? 'Crear cuenta y agendar' : 'Create account & schedule')
+        : (ctx.lang === 'es' ? 'Agendar consulta gratuita' : 'Schedule free consultation'),
       ctaType: ctx.guest ? 'estimate' : 'virtual',
       tags: ['advisor'],
     },
   ];
 }
 
-function injectActionPlan(blocks: DesignBlock[], guest: boolean): DesignBlock[] {
+function injectActionPlan(blocks: DesignBlock[], guest: boolean, lang = 'es'): DesignBlock[] {
   const withoutPlan = blocks.filter((b) => b.type !== 'action_plan');
   const existingPlan = blocks.find((b) => b.type === 'action_plan');
 
   const plan: DesignBlock = existingPlan ?? {
     type: 'action_plan',
-    title: 'Plan with All In — talk to an advisor',
-    text: 'Steps to finalize your remodel with our team.',
-    steps: buildActionPlanSteps(guest),
-    ctaLabel: guest ? 'Create account & schedule' : 'Schedule free consultation',
+    title: lang === 'es' ? 'Plan con All In — hablar con un asesor' : 'Plan with All In — talk to an advisor',
+    text: lang === 'es' ? 'Pasos para concretar tu remodelación.' : 'Steps to finalize your remodel with our team.',
+    steps: buildActionPlanSteps(guest, lang),
+    ctaLabel: guest
+      ? (lang === 'es' ? 'Crear cuenta y agendar' : 'Create account & schedule')
+      : (lang === 'es' ? 'Agendar consulta gratuita' : 'Schedule free consultation'),
     ctaType: guest ? 'estimate' : 'virtual',
     tags: ['advisor'],
   };
 
-  plan.steps = buildActionPlanSteps(guest);
-  if (!plan.ctaLabel) plan.ctaLabel = guest ? 'Create account & schedule' : 'Schedule free consultation';
+  plan.steps = buildActionPlanSteps(guest, lang);
+  if (!plan.ctaLabel) plan.ctaLabel = guest
+    ? (lang === 'es' ? 'Crear cuenta y agendar' : 'Create account & schedule')
+    : (lang === 'es' ? 'Agendar consulta gratuita' : 'Schedule free consultation');
   if (!plan.ctaType) plan.ctaType = guest ? 'estimate' : 'virtual';
 
   return [...withoutPlan.slice(0, 4), plan];
@@ -116,6 +123,7 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
 
   const contextPayload = {
     userMessage: ctx.message,
+    lang: ctx.lang,
     hasImage: ctx.hasImage,
     visionAnalysis: ctx.visionAnalysis || null,
     searchDate: ctx.searchDate,
@@ -131,11 +139,13 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
   if (!apiKey || apiKey.includes('your-key')) {
     const blocks = buildFallbackBlocks(ctx);
     return {
-      intro: 'Your AI-DA consultation is ready. Review each section — the action plan at the end connects you with an All In advisor.',
+      intro: ctx.lang === 'es'
+        ? 'Tu consulta AI-DA está lista. Revisa cada sección — el plan de acción al final te conecta con un asesor All In.'
+        : 'Your AI-DA consultation is ready. Review each section — the action plan at the end connects you with an All In advisor.',
       blocks,
       followUp: ctx.guest
-        ? 'Guest mode: create a free account to continue with an advisor.'
-        : 'Ready to schedule a virtual consultation or get a detailed quote?',
+        ? (ctx.lang === 'es' ? 'Modo invitado: crea una cuenta gratuita para continuar con un asesor.' : 'Guest mode: create a free account to continue with an advisor.')
+        : (ctx.lang === 'es' ? '¿Listo para agendar una consulta virtual o recibir una cotización?' : 'Ready to schedule a virtual consultation or get a detailed quote?'),
     };
   }
 
@@ -157,7 +167,7 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
             content: `You are AI-DA, design assistant for ALL IN Builders & All In Remodeling (Georgia) + SmartSlab marketplace.
 
 RULES:
-1. Detect the language of the user message and respond ENTIRELY in that language (intro, all blocks, followUp).
+1. The user's language code is provided in context.lang. Respond ENTIRELY in that language (intro, all blocks, followUp). Do not switch languages.
 2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
 3. Exactly 4 content blocks BEFORE action_plan will be merged — you may omit action_plan (we inject it).
 4. Block types in order: analysis, inspiration, recommendation, marketplace
@@ -211,22 +221,22 @@ RULES:
       blocks = buildFallbackBlocks(ctx).slice(0, 4);
     }
 
-    blocks = injectActionPlan(blocks, ctx.guest);
+    blocks = injectActionPlan(blocks, ctx.guest, ctx.lang);
 
     return {
-      intro: parsed.intro || 'Analysis complete — review each section below.',
+      intro: parsed.intro || (ctx.lang === 'es' ? 'Análisis completo — revisa cada sección.' : 'Analysis complete — review each section below.'),
       blocks,
       followUp: parsed.followUp || (ctx.guest
-        ? 'Create an account to continue with an All In advisor.'
-        : 'Would you like to schedule a free virtual consultation?'),
+        ? (ctx.lang === 'es' ? 'Crea una cuenta para continuar con un asesor All In.' : 'Create an account to continue with an All In advisor.')
+        : (ctx.lang === 'es' ? '¿Te gustaría agendar una consulta virtual gratuita?' : 'Would you like to schedule a free virtual consultation?')),
     };
   } catch (err) {
     console.error('Orchestrator fallback', err);
     const blocks = buildFallbackBlocks(ctx);
     return {
-      intro: 'Your AI-DA consultation is ready.',
+      intro: ctx.lang === 'es' ? 'Tu consulta AI-DA está lista.' : 'Your AI-DA consultation is ready.',
       blocks,
-      followUp: 'Would you like an All In advisor to contact you?',
+      followUp: ctx.lang === 'es' ? '¿Te gustaría que un asesor All In te contacte?' : 'Would you like an All In advisor to contact you?',
     };
   }
 }

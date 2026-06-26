@@ -34,7 +34,7 @@ export async function sendChatMessage(
   content: string,
   imageBase64?: string,
   onProgress?: (status: string) => void,
-  options?: { guest?: boolean; userMessageCount?: number },
+  options?: { guest?: boolean; userMessageCount?: number; lang?: string },
 ): Promise<ChatMessage> {
   if (options?.guest && (options.userMessageCount ?? 0) >= GUEST_MESSAGE_LIMIT) {
     return {
@@ -70,6 +70,7 @@ export async function sendChatMessage(
         message: content,
         imageBase64,
         guest: options?.guest ?? false,
+        lang: options?.lang || 'es',
       }),
     });
 

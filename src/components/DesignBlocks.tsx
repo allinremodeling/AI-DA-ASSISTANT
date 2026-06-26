@@ -8,7 +8,7 @@ const BLOCK_ORDER = [
   'analysis', 'visual_analysis',
   'inspiration', 'external_inspiration', 'trend',
   'recommendation', 'ecosystem', 'product',
-  'marketplace',
+  'marketplace', 'smartslab',
   'action_plan',
 ];
 
@@ -61,13 +61,13 @@ export function AssistantMessageBody({
               {BLOCK_SECTION_LABELS[block.type] && (
                 <h3
                   className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: block.type === 'marketplace' ? BRAND_COLORS.smartslabCyan : BRAND_COLORS.accent }}
+                  style={{ color: (block.type === 'marketplace' || block.type === 'smartslab') ? BRAND_COLORS.smartslabCyan : BRAND_COLORS.accent }}
                 >
                   {BLOCK_SECTION_LABELS[block.type]}
                 </h3>
               )}
               <DesignBlockCard block={block} />
-              {block.type === 'marketplace' && slabsForMarketplace.length > 0 && (
+              {(block.type === 'marketplace' || block.type === 'smartslab') && slabsForMarketplace.length > 0 && (
                 <div className="space-y-2 pt-1">
                   {slabsForMarketplace.map((slab) => (
                     <SmartSlabCard key={slab.id} slab={slab} />

@@ -17,6 +17,7 @@ interface ChatRequest {
   message: string;
   imageBase64?: string;
   guest?: boolean;
+  lang?: string;
 }
 
 async function searchProducts(
@@ -45,6 +46,7 @@ export default {
       const message = body.message?.trim() || "Design consultation";
       const hasImage = Boolean(body.imageBase64);
       const guest = Boolean(body.guest);
+      const lang = (body.lang || 'es').slice(0, 2).toLowerCase();
       const searchDate = new Date().toISOString().slice(0, 10);
 
       const dimensions = parseProjectDimensions(message);
@@ -52,7 +54,7 @@ export default {
 
       let visionAnalysis = "";
       if (body.imageBase64) {
-        visionAnalysis = await analyzeImageWithOpenAI(body.imageBase64, message);
+        visionAnalysis = await analyzeImageWithOpenAI(body.imageBase64, message, lang);
       }
 
       const contextQuery = `${message} ${visionAnalysis}`.slice(0, 500);
@@ -62,8 +64,8 @@ export default {
         || message.slice(0, 40);
 
       const [analysisWeb, inspirationWeb, smartslabListings, products, portfolio] = await Promise.all([
-        searchAnalysisContext(contextQuery, searchDate),
-        searchInspirationReferences(contextQuery),
+        searchAnalysisContext(contextQuery, searchDate, lang),
+        searchInspirationReferences(contextQuery, lang),
         searchSmartSlabListings(contextQuery, 4, dimensions.requiredSqft),
         searchProducts(ctx.supabaseAdmin, productQuery),
         Promise.resolve(matchPortfolio(contextQuery, 1)),
@@ -76,6 +78,7 @@ export default {
         message,
         guest,
         hasImage,
+        lang,
         visionAnalysis,
         searchDate,
         dimensions,
@@ -95,7 +98,9 @@ export default {
           products,
           smartslabListings,
           followUp: guest
-            ? followUp || "Guest mode: create an AI-DA account to continue with an All In advisor."
+            ? followUp || (lang === 'es'
+              ? "Modo invitado: crea tu cuenta AI-DA para continuar con un asesor All In."
+              : "Guest mode: create an AI-DA account to continue with an All In advisor.")
             : followUp,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },

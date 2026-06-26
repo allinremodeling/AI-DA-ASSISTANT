@@ -45,7 +45,22 @@ export function matchEcosystemServices(query: string, limit = 4) {
   return matches.slice(0, limit);
 }
 
-export function buildActionPlanSteps(guest: boolean) {
+export function buildActionPlanSteps(guest: boolean, lang = 'es') {
+  if (lang === 'en') {
+    return [
+      { step: 1, title: 'Schedule a virtual consultation', description: 'An advisor reviews your measurements, style, and budget (15–30 min).' },
+      { step: 2, title: 'Material selection', description: 'All In showroom + slabs at SmartSlab marketplace.' },
+      { step: 3, title: 'Proposal & estimate', description: 'Layout, materials, and pricing — no commitment.' },
+      {
+        step: 4,
+        title: guest ? 'Create your AI-DA account' : 'Project kickoff',
+        description: guest
+          ? 'Sign up to save your designs and continue with your advisor.'
+          : 'All In Builders handles fabrication and installation.',
+      },
+    ];
+  }
+
   return [
     { step: 1, title: 'Agenda consulta virtual', description: 'Un asesor revisa medidas, estilo y presupuesto (15–30 min).' },
     { step: 2, title: 'Selección de materiales', description: 'Showroom All In + slabs en SmartSlab marketplace.' },
