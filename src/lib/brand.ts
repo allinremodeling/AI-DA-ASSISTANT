@@ -19,7 +19,7 @@ export const ECOSYSTEM = {
     name: 'SmartSlab',
     url: 'https://smartslab.app',
     app: 'https://smart-slab-app.vercel.app',
-    browse: 'https://smart-slab-app.vercel.app/',
+    browse: 'https://smart-slab-app.vercel.app/browse',
     tagline: 'Slab & remnant marketplace',
     materials: ['Granite', 'Quartz', 'Quartzite', 'Marble', 'Dolomite'],
   },

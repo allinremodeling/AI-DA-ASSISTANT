@@ -66,7 +66,7 @@ export default {
       const [analysisWeb, inspirationWeb, smartslabListings, products, portfolio] = await Promise.all([
         searchAnalysisContext(contextQuery, searchDate, lang),
         searchInspirationReferences(contextQuery, lang),
-        searchSmartSlabListings(contextQuery, 4, dimensions.requiredSqft),
+        searchSmartSlabListings(contextQuery, 1, dimensions.requiredSqft),
         searchProducts(ctx.supabaseAdmin, productQuery),
         Promise.resolve(matchPortfolio(contextQuery, 1)),
       ]);

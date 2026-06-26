@@ -129,7 +129,7 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
       {
         type: 'marketplace',
         title: 'SmartSlab · slabs para tu proyecto',
-        text: 'Slabs y remanentes disponibles en el marketplace SmartSlab — filtrados por material y medidas.',
+        text: 'Full slab disponible en SmartSlab — seleccionado según material y medidas de tu proyecto.',
         tags: ['SmartSlab'],
       },
       {
@@ -157,17 +157,6 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
         sqft: 56.4,
         price: 1045,
         image_url: p0.imageUrl,
-        url: ECOSYSTEM.smartslab.browse,
-      },
-      {
-        id: 'demo-2',
-        name: 'Calacatta Irving',
-        material: 'Quartz',
-        type: 'full_slab',
-        location: 'Norcross, GA',
-        sqft: 56.4,
-        price: 935,
-        image_url: p1.imageUrl,
         url: ECOSYSTEM.smartslab.browse,
       },
     ],

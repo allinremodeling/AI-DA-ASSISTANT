@@ -84,30 +84,15 @@ export function AssistantMessageBody({
         )}
         {marketplace && (
           <CardSection label={BLOCK_SECTION_LABELS.marketplace} accent={BRAND_COLORS.smartslabCyan}>
-            <DesignBlockCard block={marketplace} variant="marketplace" />
+            <div className="space-y-2">
+              <DesignBlockCard block={marketplace} variant="marketplace" />
+              {slabs[0] ? (
+                <SmartSlabCard slab={slabs[0]} />
+              ) : null}
+            </div>
           </CardSection>
         )}
       </div>
-
-      {/* Card 4 listings — full width, responsive grid */}
-      {marketplace && (
-        <div className="space-y-2">
-          {slabs.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {slabs.map((slab) => (
-                <SmartSlabCard key={slab.id} slab={slab} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-[#6b6b6b] bg-[#f0fafb] border border-[#d0eef5] rounded-xl px-3 py-3 leading-relaxed">
-              Actualmente no encontramos un slab perfecto en inventario, pero un asesor All In puede ayudarte a encontrar una alternativa en{' '}
-              <a href={ECOSYSTEM.smartslab.browse} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: BRAND_COLORS.smartslabCyan }}>
-                SmartSlab
-              </a>.
-            </p>
-          )}
-        </div>
-      )}
 
       {actionPlan && (
         <div className="pt-1">
@@ -315,7 +300,7 @@ function SmartSlabCard({ slab }: { slab: SmartSlabListing }) {
         </div>
         <p className="text-sm font-medium text-[#111111] truncate">{slab.name}</p>
         <p className="text-xs text-[#6b6b6b] mt-0.5">
-          {slab.type === 'remnant' ? 'Remanente' : 'Slab completo'} · {slab.location}
+          Full slab · {slab.location}
         </p>
         <p className="text-sm font-bold mt-1" style={{ color: BRAND_COLORS.smartslabCyan }}>
           ${slab.price.toLocaleString()}

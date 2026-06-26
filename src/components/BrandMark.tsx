@@ -3,42 +3,31 @@ import { BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 export function BrandMark({
   size = 'md',
   variant = 'dark',
-  framed = true,
 }: {
   size?: 'sm' | 'md' | 'lg'
+  /** dark = black logo on light UI; light = white logo on dark surfaces */
   variant?: 'dark' | 'light'
-  framed?: boolean
 }) {
-  const heights = { sm: 'h-6', md: 'h-8', lg: 'h-10' }
+  const heights = { sm: 'h-7', md: 'h-9', lg: 'h-12' }
   const src = variant === 'light' ? BRAND_ASSETS.logoBuildersLight : BRAND_ASSETS.logoBuildersDark
 
-  const img = (
+  return (
     <img
       src={src}
       alt={ECOSYSTEM.builders.name}
-      className={`${heights[size]} w-auto max-w-[140px] object-contain object-left`}
+      className={`${heights[size]} w-auto max-w-[160px] object-contain`}
     />
-  )
-
-  if (!framed) return img
-
-  return (
-    <div className="inline-flex items-center rounded-xl bg-[#0a0a0a] px-3 py-2 shadow-sm">
-      {img}
-    </div>
   )
 }
 
 export function SmartSlabMark({ size = 'sm' }: { size?: 'sm' | 'md' }) {
-  const heights = { sm: 'h-5', md: 'h-6' }
+  const heights = { sm: 'h-6', md: 'h-7' }
   return (
-    <div className="inline-flex items-center rounded-lg bg-[#050a14] px-2.5 py-1.5">
-      <img
-        src={BRAND_ASSETS.logoSmartSlab}
-        alt={ECOSYSTEM.smartslab.name}
-        className={`${heights[size]} w-auto max-w-[100px] object-contain`}
-      />
-    </div>
+    <img
+      src={BRAND_ASSETS.logoSmartSlab}
+      alt={ECOSYSTEM.smartslab.name}
+      className={`${heights[size]} w-auto max-w-[110px] object-contain`}
+    />
   )
 }
 
@@ -46,7 +35,7 @@ export function BrandHeader({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <div className="flex items-center gap-3">
-        <BrandMark size="sm" framed={false} />
+        <BrandMark size="sm" variant="dark" />
         <div className="text-left">
           <span className="font-bold text-sm text-[#0a0a0a] block leading-tight">{BRAND.productName}</span>
           <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: BRAND_COLORS.accent }}>
@@ -59,7 +48,7 @@ export function BrandHeader({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <BrandMark size="lg" />
+      <BrandMark size="lg" variant="dark" />
 
       <div className="mt-5 space-y-2 max-w-md">
         <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-[#8a8a8a]">
@@ -82,8 +71,8 @@ export function BrandHeader({ compact = false }: { compact?: boolean }) {
         </p>
       </div>
 
-      <div className="mt-4 inline-flex items-center gap-2.5 rounded-full border border-[#e8e8e8] bg-white px-3 py-2 shadow-sm">
-        <SmartSlabMark />
+      <div className="mt-4 inline-flex items-center gap-2.5">
+        <SmartSlabMark size="md" />
         <span className="text-[11px] font-medium text-[#666]">marketplace integrado</span>
       </div>
     </div>

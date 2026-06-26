@@ -1,5 +1,5 @@
 import { buildActionPlanSteps } from './ecosystem.ts';
-import type { SmartSlabRow } from './smartslab.ts';
+import { noSlabAdvisorMessage, type SmartSlabRow } from './smartslab.ts';
 import type { TrendResult } from './trends.ts';
 import type { ProjectDimensions } from './dimensions.ts';
 
@@ -38,6 +38,19 @@ export interface OrchestratorResult {
   followUp: string;
 }
 
+function marketplaceBlockText(ctx: OrchestratorContext): string {
+  const slab = ctx.smartslabListings[0];
+  if (!slab) return noSlabAdvisorMessage(ctx.lang);
+
+  const sqftNote = ctx.dimensions.requiredSqft ? ` (~${ctx.dimensions.requiredSqft} sq ft needed)` : '';
+  const templates: Record<string, string> = {
+    es: `Full slab recomendado: ${slab.name} (${slab.material}, ${slab.sqft} sq ft, $${slab.price})${sqftNote}. Disponible en SmartSlab — ${slab.location}.`,
+    en: `Recommended full slab: ${slab.name} (${slab.material}, ${slab.sqft} sq ft, $${slab.price})${sqftNote}. Available on SmartSlab — ${slab.location}.`,
+    pt: `Full slab recomendado: ${slab.name} (${slab.material}, ${slab.sqft} sq ft, $${slab.price})${sqftNote}. Disponível no SmartSlab — ${slab.location}.`,
+    fr: `Full slab recommandé : ${slab.name} (${slab.material}, ${slab.sqft} sq ft, $${slab.price})${sqftNote}. Disponible sur SmartSlab — ${slab.location}.`,
+  };
+  return templates[ctx.lang] || templates.en;
+}
 function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
   const insp = ctx.inspirationWeb[0] || ctx.portfolioItem;
   const rec = ctx.products[0] as Record<string, unknown> | undefined;
@@ -71,10 +84,8 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
     },
     {
       type: 'marketplace',
-      title: 'SmartSlab · matching inventory',
-      text: ctx.smartslabListings.length
-        ? `Slabs that may fit your project${ctx.dimensions.requiredSqft ? ` (~${ctx.dimensions.requiredSqft} sq ft)` : ''}: ${ctx.smartslabListings.map((s) => s.name).join(', ')}.`
-        : 'Browse available slabs on SmartSlab marketplace.',
+      title: ctx.lang === 'es' ? 'SmartSlab · full slab disponible' : 'SmartSlab · available full slab',
+      text: marketplaceBlockText(ctx),
       tags: ['SmartSlab', 'marketplace'],
     },
     {
@@ -172,7 +183,7 @@ CRITICAL RULES:
 4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Must feel personal — never generic.
 5. CARD 2 inspiration: TEXT ONLY — do NOT include imageUrl. Short inspiration from Pinterest/Houzz/ArchDaily trends in inspirationWeb. Describe styles, palettes, finishes, combinations.
 6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
-7. CARD 4 marketplace: Explain why smartslabListings fit (material, dimensions, application). If listings empty, say an advisor can find alternatives at SmartSlab.
+7. CARD 4 marketplace: Show exactly ONE full slab from smartslabListings (never remnants). Explain why it fits (material, sq ft, application). If smartslabListings is empty, tell the user in their language that no matching full slab was found and an All In advisor will guide them — point to the action plan below. Do not invent listings.
 8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
 9. NEVER reuse the same phrases across different queries. Personalize from userMessage, vision, web data, products, slabs.
 10. intro: 1-2 sentences — user must feel you are actively researching (searchDate in context).
@@ -205,8 +216,8 @@ CRITICAL RULES:
     const FALLBACK_TEXTS: Record<string, Record<string, string>> = {
       recommendation: { es: `Servicios disponibles: ${ctx.services.map((s) => s.name).join(', ')}.`, en: `Available services: ${ctx.services.map((s) => s.name).join(', ')}.` },
       marketplace: {
-        es: ctx.smartslabListings.length ? `Slabs que pueden encajar: ${ctx.smartslabListings.map((s) => s.name).join(', ')}.` : 'Explora slabs disponibles en SmartSlab.',
-        en: ctx.smartslabListings.length ? `Slabs that may fit: ${ctx.smartslabListings.map((s) => s.name).join(', ')}.` : 'Browse available slabs on SmartSlab.',
+        es: marketplaceBlockText(ctx),
+        en: marketplaceBlockText(ctx),
       },
     };
 
@@ -226,6 +237,13 @@ CRITICAL RULES:
       if (type === 'recommendation' && !enriched.imageUrl) {
         const p = ctx.products[0] as Record<string, unknown> | undefined;
         enriched.imageUrl = String(p?.image_url || ctx.portfolioItem.imageUrl);
+      }
+      if (type === 'marketplace') {
+        if (ctx.smartslabListings.length === 0) {
+          enriched.text = noSlabAdvisorMessage(ctx.lang);
+        } else if (!enriched.text) {
+          enriched.text = marketplaceBlockText(ctx);
+        }
       }
       if (type === 'analysis' && (!enriched.text || enriched.text.length < 20)) {
         enriched.text = ctx.visionAnalysis
