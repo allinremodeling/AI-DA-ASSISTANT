@@ -1,6 +1,21 @@
 # Despliegue cPanel — allinremodeling.us/ai
 
-Guía paso a paso para publicar **AI-DA v1.5.0** en tu hosting cPanel.
+Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
+
+> Documentación completa de la release: [`docs/V1-5-0.md`](docs/V1-5-0.md)
+
+---
+
+## Estado de versiones (última revisión)
+
+| Entorno | Versión | Cómo verificar |
+|---------|---------|----------------|
+| GitHub `main` | **V1.5.0** (`b6e3e91+`) | Repo actualizado |
+| Build local | **V1.5.0** | `deploy-cpanel-ai.zip` en raíz |
+| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ **Anterior** | DevTools → `index-BZu9LrRK.js` = desactualizado |
+| Tras deploy | **V1.5.0** | DevTools → `index-B7yE_QLu.js` (o hash nuevo) |
+
+**Acción requerida:** subir el ZIP nuevo a cPanel y ejecutar `npm run deploy:chat` en Supabase.
 
 ---
 

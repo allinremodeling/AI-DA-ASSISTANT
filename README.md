@@ -62,7 +62,7 @@ Esto garantiza que la experiencia no se interrumpa aunque Claude Vision no esté
 | Capa | Dónde | Qué hace |
 |------|-------|----------|
 | **Frontend** | cPanel `public_html/ai/` | React SPA en `allinremodeling.us/ai` |
-| **Chat API** | Supabase Edge Function `chat` | Claude Vision, tendencias, SmartSlab, productos |
+| **Chat API** | Supabase Edge Function `chat` | OpenAI Vision, Tavily, SmartSlab, GPT orchestrator |
 | **Auth** | Supabase Auth | Login / registro usuarios AI-DA |
 
 El frontend **no** lleva API keys de OpenAI/Anthropic — solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
@@ -156,7 +156,7 @@ Merge del **Prompt Maestro AI-DA** — rediseño completo del flujo de respuesta
 - **SmartSlab como Card 4 dedicada**: el marketplace pasa de ser un listado flotante a una tarjeta estructurada dentro del flujo de 5 cards
 - **Thinking state**: mensaje de carga actualizado a `"🔎 Analizando tu proyecto..."` antes de mostrar resultados
 - **Tone personalizado**: el orquestador GPT-4o recibe `lang` explícito para evitar respuestas genéricas y variar por proyecto
-- **Documentación**: README actualizado con nueva arquitectura, tabla de 5 cards, sección de idiomas y vision fallback
+- **Documentación**: [`docs/V1-5-0.md`](docs/V1-5-0.md) — release notes, limitaciones y checklist de deploy
 
 ### v1.4.0 — 2026-06-25
 
