@@ -13,10 +13,37 @@ export interface Product {
   created_at: string;
 }
 
+export type DesignBlockType =
+  | 'analysis'
+  | 'trend'
+  | 'recommendation'
+  | 'inspiration'
+  | 'product';
+
+export interface DesignBlock {
+  type: DesignBlockType;
+  title: string;
+  text: string;
+  imageUrl?: string;
+  source?: string;
+  tags?: string[];
+}
+
+export interface StructuredChatResponse {
+  intro: string;
+  blocks: DesignBlock[];
+  products?: Product[];
+  followUp?: string;
+  generatedImage?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  intro?: string;
+  blocks?: DesignBlock[];
+  followUp?: string;
   products?: Product[];
   imageUrl?: string;
   imageUrls?: string[];
@@ -25,11 +52,8 @@ export interface ChatMessage {
   isError?: boolean;
 }
 
-export interface AssistantResponse {
-  content: string;
-  products: Product[];
+export interface AssistantResponse extends StructuredChatResponse {
   threadId: string;
-  imageUrl?: string;
 }
 
 export interface Conversation {

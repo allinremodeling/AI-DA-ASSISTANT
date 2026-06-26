@@ -3,7 +3,7 @@ import { Wand2, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 
-export default function LoginPage() {
+export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -80,6 +80,16 @@ export default function LoginPage() {
             {mode === 'signin' ? 'Iniciar sesión' : 'Crear cuenta'}
           </button>
         </form>
+
+        {onGuest && (
+          <button
+            type="button"
+            onClick={onGuest}
+            className="w-full mt-3 py-3 rounded-xl text-sm font-medium border border-[#e5e5e5] text-[#111111] hover:bg-[#f9f9f9] transition-colors"
+          >
+            Consulta express sin cuenta
+          </button>
+        )}
 
         <p className="text-center text-xs text-[#6b6b6b] mt-6">
           {mode === 'signin' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}

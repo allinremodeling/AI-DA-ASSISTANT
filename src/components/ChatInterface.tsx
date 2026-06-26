@@ -6,7 +6,6 @@ import {
   Loader2,
   ArrowUp,
   Sparkles,
-  ExternalLink,
   Trash2,
   ChevronRight,
   Menu,
@@ -15,12 +14,26 @@ import {
   Wand2,
   LogOut,
 } from 'lucide-react'
-import type { Product, ChatMessage } from '../lib/types'
+import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/utils'
-import { sendChatMessage } from '../lib/chatService'
+import { sendChatMessage, getGuestMessageLimit } from '../lib/chatService'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
+import { AssistantMessageBody } from './DesignBlocks'
 
-export function ChatInterface({ onLogout }: { onLogout: () => void }) {
+const WELCOME_AUTH = 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nSube una foto, describe tu espacio o pregunta por tendencias. Te respondere con tarjetas visuales, referencias de diseno e inventario All In.'
+const WELCOME_GUEST = 'Consulta express gratuita: 1 pregunta sin cuenta.\n\nSube una foto de tu cocina o baño y recibe recomendaciones con tendencias actuales e imagenes de referencia.'
+
+export function ChatInterface({
+  mode = 'authenticated',
+  onLogout,
+  onSignIn,
+}: {
+  mode?: 'guest' | 'authenticated'
+  onLogout?: () => void
+  onSignIn?: () => void
+}) {
+  const isGuest = mode === 'guest'
+  const guestLimit = getGuestMessageLimit()
   const [threadId, setThreadIdState] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -30,6 +43,7 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [threadList, setThreadList] = useState(getThreadList())
   const [loadingText, setLoadingText] = useState('Analizando...')
+  const [guestUserMessages, setGuestUserMessages] = useState(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -51,6 +65,17 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
   }, [input])
 
   useEffect(() => {
+    if (isGuest) {
+      setThreadIdState('guest_express')
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: WELCOME_GUEST,
+        intro: WELCOME_GUEST,
+      }])
+      return
+    }
+
     const existing = getThreadId()
     if (existing) {
       setThreadIdState(existing)
@@ -61,7 +86,8 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
         setMessages([{
           id: 'welcome',
           role: 'assistant',
-          content: 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nPuedo ayudarte con:\n\n**Analisis Visual** - Sube una foto de tu cocina y te dare recomendaciones expertas sobre estilo, colores, iluminacion y puntos de mejora.\n\n**Diseno de Layouts** - Dame las medidas (ancho x largo en pulgadas) y calculo la distribucion optima (L, U, lineal, con isla) con presupuesto estimado.\n\n**Consulta de Inventario** - Busco productos reales de nuestro catalogo: gabinetes shaker modernos, encimeras de cuarzo premium, accesorios.\n\n**Inspiracion Visual** - Genero renders conceptuales con las combinaciones de gabinetes y cuarzo que prefieras.\n\nQue te gustaria hacer?',
+          content: WELCOME_AUTH,
+          intro: WELCOME_AUTH,
         }])
       }
     } else {
@@ -70,10 +96,11 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nPuedo ayudarte con:\n\n**Analisis Visual** - Sube una foto de tu cocina y te dare recomendaciones expertas sobre estilo, colores, iluminacion y puntos de mejora.\n\n**Diseno de Layouts** - Dame las medidas (ancho x largo en pulgadas) y calculo la distribucion optima (L, U, lineal, con isla) con presupuesto estimado.\n\n**Consulta de Inventario** - Busco productos reales de nuestro catalogo: gabinetes shaker modernos, encimeras de cuarzo premium, accesorios.\n\n**Inspiracion Visual** - Genero renders conceptuales con las combinaciones de gabinetes y cuarzo que prefieras.\n\nQue te gustaria hacer?',
+        content: WELCOME_AUTH,
+        intro: WELCOME_AUTH,
       }])
     }
-  }, [])
+  }, [isGuest])
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -125,15 +152,21 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
       threadId,
       userMessage.content,
       imagePreview || undefined,
-      (status) => setLoadingText(status)
+      (status) => setLoadingText(status),
+      { guest: isGuest, userMessageCount: guestUserMessages },
     )
 
     const final = [...updated, response]
     setMessages(final)
-    saveMessages(threadId, final)
+    if (!isGuest) {
+      saveMessages(threadId, final)
+    }
+    if (isGuest) {
+      setGuestUserMessages((c) => c + 1)
+    }
     setIsLoading(false)
 
-    if (final.length <= 3 && threadId) {
+    if (!isGuest && final.length <= 3 && threadId) {
       const title = userMessage.content.slice(0, 40) + (userMessage.content.length > 40 ? '...' : '')
       saveThreadTitle(threadId, title)
       setThreadList(getThreadList())
@@ -148,12 +181,14 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
   }
 
   const handleNewChat = () => {
+    if (isGuest) return
     const newThread = createNewThread()
     setThreadIdState(newThread)
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nPuedo ayudarte con:\n\n**Analisis Visual** - Sube una foto de tu cocina y te dare recomendaciones expertas sobre estilo, colores, iluminacion y puntos de mejora.\n\n**Diseno de Layouts** - Dame las medidas (ancho x largo en pulgadas) y calculo la distribucion optima (L, U, lineal, con isla) con presupuesto estimado.\n\n**Consulta de Inventario** - Busco productos reales de nuestro catalogo: gabinetes shaker modernos, encimeras de cuarzo premium, accesorios.\n\n**Inspiracion Visual** - Genero renders conceptuales con las combinaciones de gabinetes y cuarzo que prefieras.\n\nQue te gustaria hacer?',
+      content: WELCOME_AUTH,
+      intro: WELCOME_AUTH,
     }])
     setSidebarOpen(false)
     setThreadList(getThreadList())
@@ -166,13 +201,16 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
     setMessages(saved.length > 0 ? saved : [{
       id: 'welcome',
       role: 'assistant',
-      content: 'Hola! Soy tu Asistente de Diseno de All In Remodeling.\n\nPuedo ayudarte con:\n\n**Analisis Visual** - Sube una foto de tu cocina y te dare recomendaciones expertas sobre estilo, colores, iluminacion y puntos de mejora.\n\n**Diseno de Layouts** - Dame las medidas (ancho x largo en pulgadas) y calculo la distribucion optima (L, U, lineal, con isla) con presupuesto estimado.\n\n**Consulta de Inventario** - Busco productos reales de nuestro catalogo: gabinetes shaker modernos, encimeras de cuarzo premium, accesorios.\n\n**Inspiracion Visual** - Genero renders conceptuales con las combinaciones de gabinetes y cuarzo que prefieras.\n\nQue te gustaria hacer?',
+      content: WELCOME_AUTH,
+      intro: WELCOME_AUTH,
     }])
     setSidebarOpen(false)
   }
 
   return (
     <div className="flex h-full w-full">
+      {!isGuest && (
+      <>
       {/* Sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -238,7 +276,7 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
                   allinremodeling.us
                 </a>
                 <button
-                  onClick={onLogout}
+                  onClick={() => onLogout?.()}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#6b6b6b] hover:text-[#111111] transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -301,6 +339,8 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
           </a>
         </div>
       </div>
+      </>
+      )}
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
@@ -332,9 +372,24 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
             >
               <Menu className="w-5 h-5 text-[#6b6b6b]" />
             </button>
-            <h2 className="text-sm font-medium text-[#6b6b6b]">All In AI - Asistente de Diseno</h2>
+            <h2 className="text-sm font-medium text-[#6b6b6b]">
+              {isGuest ? 'Consulta express · Invitado' : 'All In AI - Asistente de Diseno'}
+            </h2>
+            {isGuest && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                {guestUserMessages}/{guestLimit} consulta
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {isGuest && onSignIn && (
+              <button
+                onClick={onSignIn}
+                className="text-xs px-3 py-1.5 rounded-lg bg-[#111111] text-white hover:bg-[#333333]"
+              >
+                Iniciar sesión
+              </button>
+            )}
             {messages.length > 1 && (
               <button
                 onClick={() => {
@@ -417,24 +472,17 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-[#111111] mb-1">All In AI</div>
-                        <div className="text-sm text-[#111111] leading-relaxed whitespace-pre-wrap markdown-content">
-                          {message.content}
-                        </div>
-                        {message.products && message.products.length > 0 && (
-                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {message.products.map((product) => (
-                              <ProductCard key={product.id} product={product} />
-                            ))}
-                          </div>
-                        )}
-                        {message.generatedImage && (
-                          <div className="mt-4">
-                            <img
-                              src={message.generatedImage}
-                              alt="Diseno conceptual"
-                              className="rounded-xl max-h-80 object-cover"
-                            />
-                          </div>
+                        <AssistantMessageBody
+                          intro={message.intro}
+                          blocks={message.blocks}
+                          followUp={message.followUp}
+                          products={message.products}
+                          generatedImage={message.generatedImage}
+                        />
+                        {!message.blocks?.length && (
+                          <p className="text-sm text-[#111111] leading-relaxed whitespace-pre-wrap">
+                            {message.content}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -492,7 +540,7 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
                 placeholder="Describe tu cocina, sube una foto, o pregunta sobre productos..."
                 className="w-full px-4 py-3 bg-transparent text-sm text-[#111111] placeholder-[#999999] resize-none focus:outline-none min-h-[48px] max-h-[200px]"
                 rows={1}
-                disabled={isLoading}
+                disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
               />
               <div className="flex items-center justify-between px-3 pb-3">
                 <div className="flex items-center gap-1">
@@ -500,7 +548,7 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
                     onClick={() => fileInputRef.current?.click()}
                     className="p-1.5 hover:bg-[#e5e5e5] rounded-lg transition-colors text-[#6b6b6b]"
                     title="Subir imagen"
-                    disabled={isLoading}
+                    disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
                   >
                     <ImagePlus className="w-4 h-4" />
                   </button>
@@ -514,7 +562,7 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <button
                   onClick={handleSend}
-                  disabled={(!input.trim() && !imagePreview) || isLoading}
+                  disabled={(!input.trim() && !imagePreview) || isLoading || (isGuest && guestUserMessages >= guestLimit)}
                   className={cn(
                     'p-1.5 rounded-lg transition-colors',
                     (input.trim() || imagePreview) && !isLoading
@@ -531,41 +579,11 @@ export function ChatInterface({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
             <p className="text-xs text-[#999999] text-center mt-2">
-              All In AI puede cometer errores. Verifica la informacion importante. Arrastra imagenes para subirlas.
+              {isGuest
+                ? 'Modo invitado: tu consulta no se guarda. Crea cuenta para continuar.'
+                : 'All In AI puede cometer errores. Verifica la informacion importante. Arrastra imagenes para subirlas.'}
             </p>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ProductCard({ product }: { product: Product }) {
-  return (
-    <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-square bg-[#f9f9f9] relative">
-        <img
-          src={product.image_url}
-          alt={product.name}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/e5e5e5/999999?text=Producto'
-          }}
-        />
-      </div>
-      <div className="p-3">
-        <p className="text-sm font-medium text-[#111111] line-clamp-2">{product.name}</p>
-        <p className="text-xs text-[#6b6b6b] mt-1">{product.sku}</p>
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-sm font-bold text-[#111111]">${product.price.toFixed(2)}</span>
-          <a
-            href={product.woo_url || `https://allinremodeling.us/product/${product.slug || ''}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs bg-[#111111] text-white px-3 py-1.5 rounded-lg hover:bg-[#333333] transition-colors inline-flex items-center gap-1"
-          >
-            Ver <ExternalLink className="w-3 h-3" />
-          </a>
         </div>
       </div>
     </div>

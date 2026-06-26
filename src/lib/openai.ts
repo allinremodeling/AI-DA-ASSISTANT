@@ -149,7 +149,8 @@ export async function sendMessage(threadId: string, content: string, imageBase64
   }
 
   return {
-    content: textContent,
+    intro: textContent.slice(0, 200),
+    blocks: [],
     products,
     threadId,
   };

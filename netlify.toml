@@ -5,6 +5,9 @@
 [build.environment]
   VITE_BASE_PATH = "/"
 
+[functions]
+  directory = "netlify/functions"
+
 [[redirects]]
   from = "/assets/*"
   to = "/assets/:splat"
