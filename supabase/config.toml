@@ -1,0 +1,2 @@
+[functions.buscar-productos-woocommerce]
+verify_jwt = false

@@ -7,10 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@supabase/server": "^1.2.0",
     "@supabase/ssr": "^0.12.0",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -23,6 +29,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.2",
     "clsx": "^2.1.1",
+    "drizzle-kit": "^0.31.10",
     "framer-motion": "^12.42.0",
     "lucide-react": "^1.21.0",
     "oxlint": "^1.69.0",
