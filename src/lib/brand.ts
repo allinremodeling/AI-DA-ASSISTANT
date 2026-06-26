@@ -44,10 +44,18 @@ export const BRAND = {
   showroom: ECOSYSTEM.remodeling.showroom,
 } as const
 
+const BASE = import.meta.env.BASE_URL
+
+/** Public assets under /public — respects Vite base (/ai/ on cPanel). */
+export function assetUrl(path: string): string {
+  const clean = path.replace(/^\//, '')
+  return `${BASE}${clean}`
+}
+
 export const BRAND_ASSETS = {
-  logoBuildersDark: '/brand/all-in-builders-black.png',
-  logoBuildersLight: '/brand/all-in-builders-white.png',
-  logoSmartSlab: '/brand/smartslab.png',
+  logoBuildersDark: assetUrl('brand/all-in-builders-black.png'),
+  logoBuildersLight: assetUrl('brand/all-in-builders-white.png'),
+  logoSmartSlab: assetUrl('brand/smartslab.png'),
 } as const
 
 export const BRAND_COLORS = {

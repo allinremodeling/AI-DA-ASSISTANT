@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { ChatInterface } from './components/ChatInterface'
 import LoginPage from './components/LoginPage'
+import { cn } from './lib/utils'
 
 const GUEST_KEY = 'allin_ai_guest_mode'
 
@@ -79,7 +80,10 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-white text-[#111111]">
+    <div className={cn(
+      'min-h-screen w-screen bg-white text-[#111111]',
+      session || guestMode ? 'h-screen overflow-hidden' : 'overflow-y-auto',
+    )}>
       {session ? (
         <ChatInterface mode="authenticated" onLogout={() => supabase.auth.signOut()} />
       ) : guestMode ? (

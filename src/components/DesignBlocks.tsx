@@ -1,7 +1,8 @@
 import { Phone, Calendar, ExternalLink } from 'lucide-react';
 import type { DesignBlock, Product, SmartSlabListing } from '../lib/types';
 import { BLOCK_SECTION_LABELS } from '../lib/types';
-import { ADVISOR_CTA, BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
+import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
+import { BrandMark, SmartSlabMark } from './BrandMark';
 
 const BLOCK_ORDER = ['visual_analysis', 'analysis', 'external_inspiration', 'trend', 'ecosystem', 'inspiration', 'recommendation', 'product', 'action_plan'];
 
@@ -30,10 +31,10 @@ export function AssistantMessageBody({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2 pb-1 border-b border-[#e5e5e5]">
-        <img src={BRAND_ASSETS.logoBuildersDark} alt="All In Builders" className="h-6 object-contain" />
-        <span className="text-[10px] text-[#999]">×</span>
-        <img src={BRAND_ASSETS.logoSmartSlab} alt="SmartSlab" className="h-5 object-contain" />
+      <div className="flex items-center gap-2.5 pb-2 border-b border-[#e5e5e5]">
+        <BrandMark size="sm" />
+        <span className="text-[#ccc] text-xs">×</span>
+        <SmartSlabMark size="md" />
       </div>
 
       {intro && (
@@ -212,7 +213,7 @@ function SmartSlabCard({ slab }: { slab: SmartSlabListing }) {
       </div>
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <img src={BRAND_ASSETS.logoSmartSlab} alt="" className="h-3.5" />
+          <SmartSlabMark size="sm" />
           <span className="text-[10px] uppercase tracking-wide" style={{ color: BRAND_COLORS.smartslabCyan }}>
             {slab.material}
           </span>

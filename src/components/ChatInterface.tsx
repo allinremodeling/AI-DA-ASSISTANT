@@ -426,18 +426,18 @@ export function ChatInterface({
           onDragLeave={handleDragLeave}
         >
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full px-4">
+            <div className="flex flex-col items-center justify-center h-full px-4 py-8">
               <div className="text-center max-w-lg">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <div className="mx-auto mb-6">
                   <BrandMark size="lg" />
                 </div>
-                <h1 className="text-2xl font-bold text-[#0a0a0a] mb-2">
-                  {BRAND.productFullName}
+                <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#0a0a0a] mb-2">
+                  {BRAND.productName}
                 </h1>
-                <p className="text-xs tracking-[0.15em] uppercase mb-4" style={{ color: BRAND_COLORS.accent }}>
+                <p className="text-xs tracking-[0.14em] uppercase font-semibold mb-4" style={{ color: BRAND_COLORS.accent }}>
                   {BRAND.tagline}
                 </p>
-                <p className="text-[#6b6b6b] text-base mb-8 leading-relaxed">
+                <p className="text-[#666] text-base mb-8 leading-relaxed">
                   Análisis visual · Inspiración · Ecosistema All In + SmartSlab · Plan con asesor
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
@@ -445,7 +445,7 @@ export function ChatInterface({
                     'Analiza esta foto de mi cocina',
                     'Calcula layout para 120 x 108 pulgadas',
                     'Muestra cuarzo blanco con vetas',
-                    'Inspirame con un diseno moderno',
+                    'Inspírame con un diseño moderno',
                   ].map((suggestion) => (
                     <button
                       key={suggestion}
@@ -453,11 +453,11 @@ export function ChatInterface({
                         setInput(suggestion)
                         textareaRef.current?.focus()
                       }}
-                      className="p-4 bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl text-sm text-[#111111] hover:bg-[#f5f5f5] hover:border-[#d1d1d1] transition-all text-left"
+                      className="p-4 bg-white border border-[#e5e5e5] rounded-xl text-sm text-[#111111] hover:border-[#e85d04]/40 hover:shadow-md transition-all text-left group"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{suggestion}</span>
-                        <ChevronRight className="w-4 h-4 text-[#999999]" />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium leading-snug">{suggestion}</span>
+                        <ChevronRight className="w-4 h-4 text-[#bbb] group-hover:text-[#e85d04] shrink-0 transition-colors" />
                       </div>
                     </button>
                   ))}
@@ -548,7 +548,7 @@ export function ChatInterface({
                 </button>
               </div>
             )}
-            <div className="relative bg-[#f9f9f9] border border-[#e5e5e5] rounded-2xl shadow-sm focus-within:border-[#111111] focus-within:shadow-md transition-all">
+            <div className="relative bg-white border border-[#d4d4d4] rounded-2xl shadow-sm focus-within:border-[#e85d04] focus-within:ring-2 focus-within:ring-[#e85d04]/15 transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
