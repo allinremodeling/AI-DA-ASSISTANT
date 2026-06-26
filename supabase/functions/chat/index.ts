@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "@supabase/server";
+import { withSupabase } from "npm:@supabase/server";
 import { searchAnalysisContext, searchInspirationReferences, matchPortfolio, ALLIN_PORTFOLIO } from "../_shared/trends.ts";
 import { analyzeImageWithOpenAI } from "../_shared/vision.ts";
 import { matchEcosystemServices } from "../_shared/ecosystem.ts";

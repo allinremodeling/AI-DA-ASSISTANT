@@ -379,24 +379,24 @@ export function ChatInterface({
         </AnimatePresence>
 
         {/* Top bar */}
-        <div className="h-12 flex items-center justify-between px-4 border-b border-[#e5e5e5] shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="h-auto min-h-12 flex items-center justify-between px-3 sm:px-4 py-2 border-b border-[#e5e5e5] shrink-0 gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 hover:bg-[#f5f5f5] rounded-lg transition-colors lg:hidden"
+              className="p-1.5 hover:bg-[#f5f5f5] rounded-lg transition-colors lg:hidden shrink-0"
             >
               <Menu className="w-5 h-5 text-[#6b6b6b]" />
             </button>
-            <h2 className="text-sm font-medium text-[#6b6b6b]">
-              {isGuest ? `Consulta express · ${BRAND.productName}` : `${BRAND.productFullName}`}
+            <h2 className="text-xs sm:text-sm font-medium text-[#6b6b6b] truncate">
+              {isGuest ? `Express · ${BRAND.productName}` : BRAND.productName}
             </h2>
             {isGuest && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                {guestUserMessages}/{guestLimit} consulta
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0 whitespace-nowrap">
+                {guestUserMessages}/{guestLimit}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isGuest && onSignIn && (
               <button
                 onClick={onSignIn}
@@ -467,12 +467,12 @@ export function ChatInterface({
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+            <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-5 sm:space-y-6">
               {messages.map((message) => (
-                <div key={message.id} className="group">
+                <div key={message.id} className="group min-w-0">
                   {message.role === 'user' ? (
                     <div className="flex flex-col items-end">
-                      <div className="bg-[#f5f5f5] rounded-2xl rounded-tr-md px-4 py-3 max-w-[80%]">
+                      <div className="bg-[#f5f5f5] rounded-2xl rounded-tr-md px-3 sm:px-4 py-3 max-w-[92%] sm:max-w-[80%]">
                         {message.imageUrl && (
                           <img
                             src={message.imageUrl}
@@ -484,12 +484,12 @@ export function ChatInterface({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="flex gap-2 sm:gap-3 min-w-0">
+                      <div className="hidden sm:flex w-8 h-8 bg-[#111111] rounded-full items-center justify-center flex-shrink-0 mt-1">
                         <Sparkles className="w-4 h-4 text-white" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-[#111111] mb-1">All In AI</div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="text-sm font-medium text-[#111111] mb-1">AI-DA</div>
                         <AssistantMessageBody
                           intro={message.intro}
                           blocks={message.blocks}
@@ -533,7 +533,7 @@ export function ChatInterface({
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 px-4 pb-4 pt-2">
+        <div className="shrink-0 px-2 sm:px-4 pb-2 pt-2 chat-safe-bottom">
           <div className="max-w-3xl mx-auto">
             {imagePreview && (
               <div className="relative inline-block mb-2">

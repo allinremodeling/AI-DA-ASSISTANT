@@ -56,7 +56,6 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
       type: 'inspiration',
       title: insp.title,
       text: insp.text,
-      imageUrl: insp.imageUrl,
       source: insp.source,
       tags: ['inspiration'],
     },
@@ -164,21 +163,20 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
         messages: [
           {
             role: 'system',
-            content: `You are AI-DA, design assistant for ALL IN Builders & All In Remodeling (Georgia) + SmartSlab marketplace.
+            content: `You are AI-DA, a professional interior/surface design consultant for ALL IN Builders, All In Remodeling (Georgia) and SmartSlab marketplace.
 
-RULES:
-1. The user's language code is provided in context.lang. Respond ENTIRELY in that language (intro, all blocks, followUp). Do not switch languages.
+CRITICAL RULES:
+1. Use context.lang — respond ENTIRELY in that language (intro, blocks, followUp). Never switch languages.
 2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
-3. Exactly 4 content blocks BEFORE action_plan will be merged — you may omit action_plan (we inject it).
-4. Block types in order: analysis, inspiration, recommendation, marketplace
-5. Card 1 (analysis): Start validating their project — paraphrase what they want, confirm understanding, summarize what web context suggests. Tone: "Ok, let me analyze..." equivalent in their language. Use visionAnalysis if present.
-6. Card 2 (inspiration): Use inspirationWeb data — include imageUrl and source from context when available. Pinterest/Houzz style reference embedded in chat.
-7. Card 3 (recommendation): Recommend specific All In products/services from context — NOT generic Calacatta unless user asked.
-8. Card 4 (marketplace): Explain why listed SmartSlab slabs fit their dimensions/material needs. Reference smartslabListings by name, sqft, price.
-9. Each block: {type, title, text, imageUrl?, source?, tags?[]}
-10. Personalize every title and text to THIS specific query — never copy generic templates.
-11. intro: 1-2 sentences acknowledging you're analyzing their project.
-12. followUp: 1 engaging question to move toward advisor contact.`,
+3. Provide exactly 4 blocks with types in order: analysis, inspiration, recommendation, marketplace (action_plan is injected by us — omit it).
+4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Must feel personal — never generic.
+5. CARD 2 inspiration: TEXT ONLY — do NOT include imageUrl. Short inspiration from Pinterest/Houzz/ArchDaily trends in inspirationWeb. Describe styles, palettes, finishes, combinations.
+6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
+7. CARD 4 marketplace: Explain why smartslabListings fit (material, dimensions, application). If listings empty, say an advisor can find alternatives at SmartSlab.
+8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
+9. NEVER reuse the same phrases across different queries. Personalize from userMessage, vision, web data, products, slabs.
+10. intro: 1-2 sentences — user must feel you are actively researching (searchDate in context).
+11. followUp: one question toward speaking with an All In advisor.`,
           },
           {
             role: 'user',
@@ -198,13 +196,32 @@ RULES:
 
     let blocks: DesignBlock[] = Array.isArray(parsed.blocks) ? parsed.blocks : [];
 
+    const FALLBACK_TITLES: Record<string, Record<string, string>> = {
+      analysis: { es: 'Tu proyecto — lo que entendemos', en: 'Your project — what we understand' },
+      inspiration: { es: 'Inspiración para tu espacio', en: 'Inspiration for your space' },
+      recommendation: { es: 'Recomendación All In', en: 'All In recommendation' },
+      marketplace: { es: 'Smart Slab — inventario disponible', en: 'Smart Slab — available inventory' },
+    };
+    const FALLBACK_TEXTS: Record<string, Record<string, string>> = {
+      recommendation: { es: `Servicios disponibles: ${ctx.services.map((s) => s.name).join(', ')}.`, en: `Available services: ${ctx.services.map((s) => s.name).join(', ')}.` },
+      marketplace: {
+        es: ctx.smartslabListings.length ? `Slabs que pueden encajar: ${ctx.smartslabListings.map((s) => s.name).join(', ')}.` : 'Explora slabs disponibles en SmartSlab.',
+        en: ctx.smartslabListings.length ? `Slabs that may fit: ${ctx.smartslabListings.map((s) => s.name).join(', ')}.` : 'Browse available slabs on SmartSlab.',
+      },
+    };
+
     blocks = blocks.map((b, i) => {
       const type = ['analysis', 'inspiration', 'recommendation', 'marketplace'][i] || b.type;
+      const lang = ctx.lang === 'en' ? 'en' : 'es';
       const enriched = { ...b, type };
 
-      if (type === 'inspiration' && !enriched.imageUrl && ctx.inspirationWeb[0]) {
-        enriched.imageUrl = ctx.inspirationWeb[0].imageUrl;
-        enriched.source = enriched.source || ctx.inspirationWeb[0].source;
+      if (!enriched.title) enriched.title = FALLBACK_TITLES[type]?.[lang] || type;
+      if (!enriched.text && FALLBACK_TEXTS[type]) enriched.text = FALLBACK_TEXTS[type][lang];
+
+      if (type === 'inspiration') {
+        delete enriched.imageUrl;
+        if (!enriched.source && ctx.inspirationWeb[0]) enriched.source = ctx.inspirationWeb[0].source;
+        if (!enriched.text && ctx.inspirationWeb[0]) enriched.text = ctx.inspirationWeb[0].text;
       }
       if (type === 'recommendation' && !enriched.imageUrl) {
         const p = ctx.products[0] as Record<string, unknown> | undefined;
@@ -212,7 +229,7 @@ RULES:
       }
       if (type === 'analysis' && (!enriched.text || enriched.text.length < 20)) {
         enriched.text = ctx.visionAnalysis
-          || `Project: "${ctx.message.slice(0, 180)}" — ${ctx.dimensionsText}`;
+          || `${lang === 'es' ? 'Proyecto' : 'Project'}: "${ctx.message.slice(0, 180)}" — ${ctx.dimensionsText}`;
       }
       return enriched;
     });

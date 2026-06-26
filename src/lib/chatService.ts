@@ -13,6 +13,11 @@ export function getGuestMessageLimit(): number {
   return GUEST_MESSAGE_LIMIT;
 }
 
+export function getUserLang(): string {
+  if (typeof navigator === 'undefined') return 'es';
+  return (navigator.language || 'es').slice(0, 2).toLowerCase();
+}
+
 function structuredToMessage(data: StructuredChatResponse): ChatMessage {
   const summary = data.intro || 'Consulta AI-DA completada';
 
@@ -55,7 +60,9 @@ export async function sendChatMessage(
     };
   }
 
-  onProgress?.('Analizando tu consulta e imagen...');
+  onProgress?.('🔎 Ok, déjame analizar tu proyecto...');
+
+  const lang = options?.lang || getUserLang();
 
   try {
     const res = await fetch(CHAT_API, {
@@ -70,12 +77,12 @@ export async function sendChatMessage(
         message: content,
         imageBase64,
         guest: options?.guest ?? false,
-        lang: options?.lang || 'es',
+        lang,
       }),
     });
 
     if (res.ok) {
-      onProgress?.('Generando recomendaciones...');
+      onProgress?.('Buscando inspiración y materiales...');
       const data = (await res.json()) as StructuredChatResponse;
       return structuredToMessage(data);
     }
@@ -107,8 +114,7 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
       {
         type: 'inspiration',
         title: p0.title,
-        text: `${p0.text} Referencia visual embebida — sin salir del chat.`,
-        imageUrl: p0.imageUrl,
+        text: `${p0.text} Paleta y acabados inspirados en tendencias actuales (Pinterest, Houzz, revistas de diseño).`,
         source: 'Inspiración AI-DA',
         tags: ['inspiración'],
       },
