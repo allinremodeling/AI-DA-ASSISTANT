@@ -4,12 +4,22 @@ import { BLOCK_SECTION_LABELS } from '../lib/types';
 import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
 import { BrandMark, SmartSlabMark } from './BrandMark';
 
-const BLOCK_ORDER = ['visual_analysis', 'analysis', 'external_inspiration', 'trend', 'ecosystem', 'inspiration', 'recommendation', 'product', 'action_plan'];
+const BLOCK_ORDER = [
+  'analysis', 'visual_analysis',
+  'inspiration', 'external_inspiration', 'trend',
+  'recommendation', 'ecosystem', 'product',
+  'marketplace',
+  'action_plan',
+];
 
 function sortBlocks(blocks: DesignBlock[]): DesignBlock[] {
   return [...blocks].sort(
     (a, b) => BLOCK_ORDER.indexOf(a.type) - BLOCK_ORDER.indexOf(b.type),
   );
+}
+
+function isActionPlan(block: DesignBlock) {
+  return block.type === 'action_plan';
 }
 
 export function AssistantMessageBody({
@@ -28,6 +38,9 @@ export function AssistantMessageBody({
   generatedImage?: string;
 }) {
   const sorted = blocks ? sortBlocks(blocks) : [];
+  const actionPlan = sorted.find(isActionPlan);
+  const contentBlocks = sorted.filter((b) => !isActionPlan(b));
+  const slabsForMarketplace = smartslabListings?.length ? smartslabListings : [];
 
   return (
     <div className="space-y-5">
@@ -41,39 +54,40 @@ export function AssistantMessageBody({
         <p className="text-sm text-[#111111] leading-relaxed">{intro}</p>
       )}
 
-      {sorted.map((block, i) => {
-        const sectionLabel = BLOCK_SECTION_LABELS[block.type];
-        const showSection = sectionLabel && (i === 0 || BLOCK_SECTION_LABELS[sorted[i - 1]?.type] !== sectionLabel);
-
-        return (
-          <div key={`${block.type}-${block.title}-${i}`} className="space-y-2">
-            {showSection && sectionLabel && (
-              <h3
-                className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: BRAND_COLORS.accent }}
-              >
-                {sectionLabel}
-              </h3>
-            )}
-            {block.type === 'action_plan' ? (
-              <ActionPlanCard block={block} />
-            ) : (
+      {contentBlocks.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {contentBlocks.map((block, i) => (
+            <div key={`${block.type}-${block.title}-${i}`} className="space-y-2">
+              {BLOCK_SECTION_LABELS[block.type] && (
+                <h3
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: block.type === 'marketplace' ? BRAND_COLORS.smartslabCyan : BRAND_COLORS.accent }}
+                >
+                  {BLOCK_SECTION_LABELS[block.type]}
+                </h3>
+              )}
               <DesignBlockCard block={block} />
-            )}
-          </div>
-        );
-      })}
+              {block.type === 'marketplace' && slabsForMarketplace.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {slabsForMarketplace.map((slab) => (
+                    <SmartSlabCard key={slab.id} slab={slab} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      {smartslabListings && smartslabListings.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: BRAND_COLORS.smartslabCyan }}>
-            SmartSlab · Slabs disponibles
+      {actionPlan && (
+        <div className="pt-1">
+          <h3
+            className="text-xs font-semibold uppercase tracking-wider mb-2"
+            style={{ color: BRAND_COLORS.accent }}
+          >
+            {BLOCK_SECTION_LABELS.action_plan}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {smartslabListings.map((slab) => (
-              <SmartSlabCard key={slab.id} slab={slab} />
-            ))}
-          </div>
+          <ActionPlanCard block={actionPlan} />
         </div>
       )}
 
@@ -81,7 +95,7 @@ export function AssistantMessageBody({
         <img src={generatedImage} alt="Render conceptual" className="rounded-xl max-h-80 w-full object-cover" />
       )}
 
-      {products && products.length > 0 && (
+      {products && products.length > 0 && !sorted.some((b) => b.type === 'recommendation' || b.type === 'ecosystem') && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: BRAND_COLORS.accent }}>
             Catálogo All In Remodeling
@@ -102,16 +116,17 @@ export function AssistantMessageBody({
 }
 
 function DesignBlockCard({ block }: { block: DesignBlock }) {
-  const isExternal = block.type === 'external_inspiration' || block.type === 'trend';
+  const isExternal = block.type === 'inspiration' || block.type === 'external_inspiration' || block.type === 'trend';
+  const isAnalysis = block.type === 'analysis' || block.type === 'visual_analysis';
 
   return (
-    <article className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+    <article className={`bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col ${isAnalysis ? 'min-h-[120px]' : ''}`}>
       {block.imageUrl && (
-        <div className="aspect-[4/3] bg-[#f9f9f9]">
+        <div className="aspect-[4/3] bg-[#f9f9f9] shrink-0">
           <img src={block.imageUrl} alt={block.title} className="w-full h-full object-cover" loading="lazy" />
         </div>
       )}
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2 flex-1">
         <h4 className="text-sm font-semibold text-[#111111]">{block.title}</h4>
         <p className="text-xs text-[#6b6b6b] leading-relaxed">{block.text}</p>
         {block.source && (
@@ -207,7 +222,12 @@ function ActionPlanCard({ block }: { block: DesignBlock }) {
 
 function SmartSlabCard({ slab }: { slab: SmartSlabListing }) {
   return (
-    <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden">
+    <a
+      href={slab.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:shadow-md transition-shadow block"
+    >
       <div className="aspect-[4/3] bg-[#f0fafb]">
         <img src={slab.image_url} alt={slab.name} className="w-full h-full object-cover" loading="lazy" />
       </div>
@@ -227,7 +247,7 @@ function SmartSlabCard({ slab }: { slab: SmartSlabListing }) {
           {slab.sqft > 1 && <span className="text-xs font-normal text-[#999]"> · {slab.sqft} sq ft</span>}
         </p>
       </div>
-    </div>
+    </a>
   );
 }
 

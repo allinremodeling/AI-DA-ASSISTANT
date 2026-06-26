@@ -31,17 +31,19 @@ export interface SmartSlabListing {
   url: string
 }
 
-/** Four-pillar response structure for AI-DA ecosystem */
+/** Five-card response structure for AI-DA ecosystem */
 export type DesignBlockType =
+  | 'analysis'
+  | 'inspiration'
+  | 'recommendation'
+  | 'marketplace'
+  | 'action_plan'
+  /** legacy aliases */
   | 'visual_analysis'
   | 'external_inspiration'
   | 'ecosystem'
-  | 'action_plan'
-  /** legacy aliases */
-  | 'analysis'
+  | 'smartslab'
   | 'trend'
-  | 'recommendation'
-  | 'inspiration'
   | 'product'
 
 export interface DesignBlock {
@@ -96,13 +98,15 @@ export interface Conversation {
 }
 
 export const BLOCK_SECTION_LABELS: Record<string, string> = {
-  visual_analysis: '1 · Análisis visual',
-  analysis: '1 · Análisis visual',
-  external_inspiration: '2 · Inspiración externa',
-  trend: '2 · Inspiración externa',
-  ecosystem: '3 · Ecosistema All In',
-  inspiration: '3 · Ecosistema All In',
-  recommendation: '3 · Ecosistema All In',
-  product: '3 · Ecosistema All In',
-  action_plan: '4 · Plan de acción',
+  analysis: '1 · Análisis',
+  visual_analysis: '1 · Análisis',
+  inspiration: '2 · Inspiración AI-DA',
+  external_inspiration: '2 · Inspiración AI-DA',
+  trend: '2 · Inspiración AI-DA',
+  recommendation: '3 · Recomendación AI-DA',
+  ecosystem: '3 · Recomendación AI-DA',
+  product: '3 · Recomendación AI-DA',
+  marketplace: '4 · Smart Slab',
+  smartslab: '4 · Smart Slab',
+  action_plan: '5 · Plan de acción',
 }

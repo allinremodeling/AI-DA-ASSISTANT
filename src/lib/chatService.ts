@@ -55,7 +55,7 @@ export async function sendChatMessage(
     };
   }
 
-  onProgress?.('Analizando foto con Claude Vision...');
+  onProgress?.('Analizando tu consulta e imagen...');
 
   try {
     const res = await fetch(CHAT_API, {
@@ -93,31 +93,37 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
   const p1 = portfolio[1] || ALLIN_PORTFOLIO[2];
 
   return structuredToMessage({
-    intro: 'Consulta AI-DA (modo demo local). En producción Supabase conecta Claude Vision, SmartSlab y el ecosistema All In.',
+    intro: 'Ok, déjame analizar tu proyecto (modo demo local). En producción, Supabase conecta OpenAI Vision, web search y SmartSlab.',
     blocks: [
       {
-        type: 'visual_analysis',
-        title: hasImage ? 'Análisis visual' : 'Evaluación inicial',
+        type: 'analysis',
+        title: 'Tu proyecto — lo que entendemos',
         text: hasImage
-          ? 'Activa ANTHROPIC_API_KEY en Supabase secrets para análisis Claude Vision de tu foto.'
-          : content.slice(0, 200),
-        tags: ['AI-DA'],
+          ? `Analizamos tu foto y consulta: "${content.slice(0, 120)}". Configura OPENAI_API_KEY en Supabase para análisis visual completo.`
+          : `Entendemos que buscas: "${content.slice(0, 200)}". Validamos tu intención con tendencias actuales de remodelación en Georgia.`,
+        tags: ['AI-DA', 'análisis'],
       },
       {
-        type: 'external_inspiration',
-        title: 'Tendencia: Calacatta & Waterfall',
-        text: 'Referencia de diseño 2026 mostrada aquí — sin salir del chat.',
+        type: 'inspiration',
+        title: p0.title,
+        text: `${p0.text} Referencia visual embebida — sin salir del chat.`,
         imageUrl: p0.imageUrl,
-        source: 'Design trend 2026',
-        tags: ['tendencia'],
+        source: 'Inspiración AI-DA',
+        tags: ['inspiración'],
       },
       {
-        type: 'ecosystem',
-        title: `${p0.title} · SmartSlab Calacatta`,
-        text: `${p0.text} Slabs y remanentes disponibles vía SmartSlab en Georgia.`,
+        type: 'recommendation',
+        title: `${p0.title} · All In`,
+        text: `${p1.text} All In Remodeling ofrece gabinetes, cuarzo Calacatta e instalación en Georgia.`,
         imageUrl: p1.imageUrl,
-        source: 'All In Remodeling · SmartSlab',
-        tags: ['ecosistema'],
+        source: 'All In Remodeling · All In Builders',
+        tags: ['recomendación'],
+      },
+      {
+        type: 'marketplace',
+        title: 'SmartSlab · slabs para tu proyecto',
+        text: 'Slabs y remanentes disponibles en el marketplace SmartSlab — filtrados por material y medidas.',
+        tags: ['SmartSlab'],
       },
       {
         type: 'action_plan',
@@ -144,6 +150,17 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
         sqft: 56.4,
         price: 1045,
         image_url: p0.imageUrl,
+        url: ECOSYSTEM.smartslab.browse,
+      },
+      {
+        id: 'demo-2',
+        name: 'Calacatta Irving',
+        material: 'Quartz',
+        type: 'full_slab',
+        location: 'Norcross, GA',
+        sqft: 56.4,
+        price: 935,
+        image_url: p1.imageUrl,
         url: ECOSYSTEM.smartslab.browse,
       },
     ],
