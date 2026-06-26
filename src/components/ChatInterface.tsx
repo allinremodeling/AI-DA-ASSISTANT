@@ -13,13 +13,14 @@ import {
   Plus,
   MessageSquare,
   Wand2,
+  LogOut,
 } from 'lucide-react'
 import type { Product, ChatMessage } from '../lib/types'
 import { cn } from '../lib/utils'
 import { sendChatMessage } from '../lib/chatService'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 
-export function ChatInterface() {
+export function ChatInterface({ onLogout }: { onLogout: () => void }) {
   const [threadId, setThreadIdState] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -236,6 +237,13 @@ export function ChatInterface() {
                   <Wand2 className="w-3.5 h-3.5" />
                   allinremodeling.us
                 </a>
+                <button
+                  onClick={onLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#6b6b6b] hover:text-[#111111] transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Cerrar sesión
+                </button>
               </div>
             </motion.aside>
           </>
