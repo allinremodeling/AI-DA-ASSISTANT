@@ -118,7 +118,10 @@ export async function searchInspirationReferences(query: string, lang = 'es'): P
     : 'inspiración diseño interiores cocina baño tendencias';
   const tavilyQuery = `${query} ${langKeyword} 2026`;
   const web = await tavilySearch(tavilyQuery, 4);
-  if (web.length > 0) return web.slice(0, 3);
+  if (web.length > 0) {
+    const rich = web.filter((r) => r.imageUrl && r.text.length > 40);
+    return (rich.length > 0 ? rich : web).slice(0, 3);
+  }
 
   const portfolio = matchPortfolio(query, 2).map((p) => ({
     title: p.title,

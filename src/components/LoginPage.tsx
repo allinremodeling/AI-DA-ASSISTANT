@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Phone, Sparkles, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getAuthRedirectUrl } from '../lib/authRedirect'
 import { cn } from '../lib/utils'
 import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { BrandHeader } from './BrandMark'
@@ -26,7 +27,11 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: getAuthRedirectUrl() },
+      })
       if (error) setError(error.message)
       else setSuccess('Revisa tu correo para confirmar tu cuenta.')
     }

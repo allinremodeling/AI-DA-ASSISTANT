@@ -69,6 +69,7 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
       type: 'inspiration',
       title: insp.title,
       text: insp.text,
+      imageUrl: insp.imageUrl,
       source: insp.source,
       tags: ['inspiration'],
     },
@@ -181,7 +182,7 @@ CRITICAL RULES:
 2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
 3. Provide exactly 4 blocks with types in order: analysis, inspiration, recommendation, marketplace (action_plan is injected by us — omit it).
 4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Must feel personal — never generic.
-5. CARD 2 inspiration: TEXT ONLY — do NOT include imageUrl. Short inspiration from Pinterest/Houzz/ArchDaily trends in inspirationWeb. Describe styles, palettes, finishes, combinations.
+5. CARD 2 inspiration: Short trend reference text from inspirationWeb. We inject imageUrl server-side from inspirationWeb — do NOT invent image URLs in JSON.
 6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
 7. CARD 4 marketplace: Show exactly ONE full slab from smartslabListings (never remnants). Explain why it fits (material, sq ft, application). If smartslabListings is empty, tell the user in their language that no matching full slab was found and an All In advisor will guide them — point to the action plan below. Do not invent listings.
 8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
@@ -230,9 +231,11 @@ CRITICAL RULES:
       if (!enriched.text && FALLBACK_TEXTS[type]) enriched.text = FALLBACK_TEXTS[type][lang];
 
       if (type === 'inspiration') {
-        delete enriched.imageUrl;
-        if (!enriched.source && ctx.inspirationWeb[0]) enriched.source = ctx.inspirationWeb[0].source;
-        if (!enriched.text && ctx.inspirationWeb[0]) enriched.text = ctx.inspirationWeb[0].text;
+        const ref = ctx.inspirationWeb[0];
+        if (ref?.imageUrl) enriched.imageUrl = ref.imageUrl;
+        if (!enriched.source && ref) enriched.source = ref.source;
+        if (!enriched.text && ref) enriched.text = ref.text;
+        if (!enriched.title && ref) enriched.title = ref.title;
       }
       if (type === 'recommendation' && !enriched.imageUrl) {
         const p = ctx.products[0] as Record<string, unknown> | undefined;

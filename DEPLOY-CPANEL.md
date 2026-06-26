@@ -50,9 +50,13 @@ npx supabase secrets set `
 
 # Opcional — inventario SmartSlab en vivo:
 npx supabase secrets set `
+  SMARTSLAB_API_URL=https://smart-slab-app.vercel.app `
+  SMARTSLAB_API_KEY=... `
   SMARTSLAB_SUPABASE_URL=https://xxx.supabase.co `
   SMARTSLAB_SUPABASE_SECRET_KEY=sb_secret_...
 ```
+
+> **SmartSlab feed:** AI-DA lee inventario en vivo desde [`smart-slab-app.vercel.app/browse`](https://smart-slab-app.vercel.app/browse) (listings embebidos en la página). Opcional: `SMARTSLAB_BROWSE_URL` para override. Fallback: API JSON → Supabase → lista estática.
 
 > **v1.5.0** usa **OpenAI Vision** (`gpt-4o-mini`) — ya no requiere `ANTHROPIC_API_KEY`.
 
@@ -75,7 +79,10 @@ Asegúrate de tener `.env.local` con:
 ```
 VITE_SUPABASE_URL=https://nchzvkvinhpnowopqbfb.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_...
+VITE_AUTH_REDIRECT_URL=https://allinremodeling.us/ai/
 ```
+
+> `VITE_AUTH_REDIRECT_URL` evita que el correo de confirmación redirija a `localhost`.
 
 Genera build + ZIP:
 
@@ -138,6 +145,15 @@ Contenido del ZIP:
 
 ### Logos rotos
 - El build usa rutas `/ai/brand/...` — sube el ZIP completo, no archivos sueltos viejos
+
+### Correo de confirmación abre `localhost:3000`
+1. **Supabase Dashboard** → **Authentication** → **URL Configuration**
+2. **Site URL:** `https://allinremodeling.us/ai/`
+3. **Redirect URLs** (añade todas):
+   - `https://allinremodeling.us/ai/**`
+   - `http://localhost:5173/**` (desarrollo local)
+4. En `.env.local` define `VITE_AUTH_REDIRECT_URL=https://allinremodeling.us/ai/` y vuelve a ejecutar `npm run deploy:cpanel`
+5. El usuario debe **crear cuenta de nuevo** o reenviar confirmación (el enlace viejo sigue apuntando a localhost)
 
 ---
 

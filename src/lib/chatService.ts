@@ -115,6 +115,7 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
         type: 'inspiration',
         title: p0.title,
         text: `${p0.text} Paleta y acabados inspirados en tendencias actuales (Pinterest, Houzz, revistas de diseño).`,
+        imageUrl: p0.imageUrl,
         source: 'Inspiración AI-DA',
         tags: ['inspiración'],
       },

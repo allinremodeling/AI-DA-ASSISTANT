@@ -10,33 +10,139 @@ export interface SmartSlabRow {
   url: string;
 }
 
-const BROWSE_URL = 'https://smart-slab-app.vercel.app/browse';
+const APP_ORIGIN = 'https://smart-slab-app.vercel.app';
+const BROWSE_URL = `${APP_ORIGIN}/browse`;
+const API_PATHS = ['/api/listings', '/api/public/listings', '/api/v1/listings'];
 
-/** Full slabs synced from smart-slab-app.vercel.app/browse (fallback). */
+/** Static fallback when browse feed is unreachable. */
 const FALLBACK_FULL_SLABS: SmartSlabRow[] = [
   { id: 'ss-hudson', name: 'Calacatta Hudson', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 1045, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/Calacatta-alpharetta.jpeg', url: BROWSE_URL },
   { id: 'ss-irving', name: 'Calacatta Irving', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 935, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/nikkita1.jpeg', url: BROWSE_URL },
   { id: 'ss-plano', name: 'Calacatta Plano', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 935, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/nikkita1.jpeg', url: BROWSE_URL },
-  { id: 'ss-buffalo', name: 'Calacatta Buffalo', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 935, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/Calacatta-alpharetta.jpeg', url: BROWSE_URL },
-  { id: 'ss-jamaica', name: 'Calacatta Jamaica', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 935, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/nikkita1.jpeg', url: BROWSE_URL },
-  { id: 'ss-boston', name: 'Calacatta Boston', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 935, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/Calacatta-alpharetta.jpeg', url: BROWSE_URL },
-  { id: 'ss-orlando', name: 'Calacatta Orlando', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 56.4, price: 770, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/nikkita1.jpeg', url: BROWSE_URL },
-  { id: 'ss-strong', name: 'Calacatta Strong', material: 'Quartz', type: 'full_slab', location: 'Norcross, GA', sqft: 72.3, price: 1250, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/Calacatta-alpharetta.jpeg', url: BROWSE_URL },
   { id: 'ss-santa', name: 'Santa Cecilia', material: 'Granite', type: 'full_slab', location: 'Suwanee, GA', sqft: 56, price: 659, image_url: 'https://allinremodeling.us/wp-content/uploads/2025/05/nikkitta2.jpeg', url: BROWSE_URL },
 ];
 
+/** SmartSlab browse stores slab size in inches (legacy field names widthCm/heightCm). */
+function slabSqft(width: number, height: number): number {
+  if (!width || !height) return 0;
+  return Math.round((width * height) / 144 * 10) / 10;
+}
+
+/**
+ * Parse live listings embedded in smart-slab-app.vercel.app/browse (Next.js RSC payload).
+ * @see https://smart-slab-app.vercel.app/browse
+ */
+function parseBrowseFeedHtml(html: string): SmartSlabRow[] {
+  const normalized = html.replace(/\\"/g, '"');
+  const seen = new Set<string>();
+  const rows: SmartSlabRow[] = [];
+
+  const listingRe =
+    /"id":"([a-f0-9-]{36})","vendorId":"[^"]*","locationId":[^,]*,"materialId":"[^"]*","type":"(full_slab|remnant)"[\s\S]*?"name":"([^"]+)"[\s\S]*?"widthCm":"([^"]+)"[\s\S]*?"heightCm":"([^"]+)"[\s\S]*?"city":"([^"]*?)"[\s\S]*?"state":"([^"]*?)"[\s\S]*?"price":"([^"]+)"[\s\S]*?"material":\{"id":"[^"]*","name":"([^"]+)"/g;
+
+  for (const match of normalized.matchAll(listingRe)) {
+    const [, id, type, name, width, height, city, state, price, material] = match;
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    const chunk = normalized.slice(match.index ?? 0, (match.index ?? 0) + 2800);
+    const imageMatch = chunk.match(/"images":\[\{"id":"[^"]*","slabId":"[^"]*","url":"(https:[^"]+)"/);
+
+    rows.push({
+      id,
+      name,
+      material,
+      type,
+      location: [city, state].filter(Boolean).join(', ') || 'Georgia',
+      sqft: slabSqft(parseFloat(width), parseFloat(height)),
+      price: Math.round(parseFloat(price)),
+      image_url: imageMatch?.[1] || FALLBACK_FULL_SLABS[0].image_url,
+      url: `${APP_ORIGIN}/slab/${id}`,
+    });
+  }
+
+  return rows;
+}
+
+async function fetchFromBrowseFeed(): Promise<SmartSlabRow[]> {
+  const feedUrl = Deno.env.get('SMARTSLAB_BROWSE_URL') || BROWSE_URL;
+  try {
+    const res = await fetch(feedUrl, {
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'AI-DA/1.5 SmartSlab-Browse-Feed',
+      },
+    });
+    if (!res.ok) {
+      console.error('SmartSlab browse feed HTTP', res.status);
+      return [];
+    }
+    const rows = parseBrowseFeedHtml(await res.text());
+    console.log(`SmartSlab browse feed: ${rows.length} listings parsed`);
+    return rows;
+  } catch (err) {
+    console.error('SmartSlab browse feed error', err);
+    return [];
+  }
+}
+
+function extractListingRows(data: unknown): Record<string, unknown>[] {
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    for (const key of ['listings', 'data', 'results', 'items', 'slabs']) {
+      if (Array.isArray(obj[key])) return obj[key] as Record<string, unknown>[];
+    }
+  }
+  return [];
+}
+
+function pickImage(row: Record<string, unknown>): string {
+  const direct = row.image_url ?? row.imageUrl ?? row.image ?? row.thumbnail_url ?? row.thumbnailUrl;
+  if (direct && String(direct).startsWith('http')) return String(direct);
+
+  if (Array.isArray(row.images) && row.images[0]) {
+    const img = row.images[0];
+    if (typeof img === 'string') return img;
+    if (img && typeof img === 'object') {
+      const o = img as Record<string, unknown>;
+      if (o.url && String(o.url).startsWith('http')) return String(o.url);
+    }
+  }
+
+  return FALLBACK_FULL_SLABS[0].image_url;
+}
+
+function listingUrl(row: Record<string, unknown>): string {
+  const direct = row.url ?? row.link ?? row.listing_url ?? row.listingUrl;
+  if (direct && String(direct).startsWith('http')) return String(direct);
+
+  const id = row.id;
+  if (id && /^[a-f0-9-]{36}$/i.test(String(id))) {
+    return `${APP_ORIGIN}/slab/${id}`;
+  }
+
+  return BROWSE_URL;
+}
+
 function normalizeRow(row: Record<string, unknown>): SmartSlabRow {
-  const type = String(row.type ?? row.listing_type ?? 'full_slab');
+  const type = String(row.type ?? row.listing_type ?? row.listingType ?? 'full_slab');
+  const locationParts = [row.location, row.city, row.state].filter(Boolean).map(String);
+  const material = row.material;
+  const materialName = typeof material === 'object' && material && 'name' in (material as object)
+    ? String((material as Record<string, unknown>).name)
+    : String(row.stone_type ?? row.stoneType ?? 'Quartz');
+
   return {
     id: String(row.id ?? row.slug ?? crypto.randomUUID()),
     name: String(row.name ?? row.title ?? 'Slab listing'),
-    material: String(row.material ?? row.stone_type ?? 'Quartz'),
+    material: materialName,
     type,
-    location: String(row.location ?? row.city ?? 'Georgia'),
-    sqft: Number(row.sqft ?? row.square_feet ?? 0),
-    price: Number(row.price ?? 0),
-    image_url: String(row.image_url ?? row.imageUrl ?? row.image ?? FALLBACK_FULL_SLABS[0].image_url),
-    url: String(row.url ?? row.link ?? BROWSE_URL),
+    location: locationParts.length ? locationParts.join(', ') : 'Georgia',
+    sqft: Number(row.sqft ?? row.square_feet ?? row.squareFeet ?? row.area_sqft ?? 0),
+    price: Number(row.price ?? row.list_price ?? row.listPrice ?? 0),
+    image_url: pickImage(row),
+    url: listingUrl(row),
   };
 }
 
@@ -49,13 +155,20 @@ function scoreListing(row: SmartSlabRow, query: string, requiredSqft: number | n
   const q = query.toLowerCase();
   let score = 0;
 
-  if (/quartz|cuarzo|calacatta/i.test(q) && /quartz/i.test(row.material)) score += 3;
-  if (/granite|granito/i.test(q) && /granite/i.test(row.material)) score += 3;
-  if (/marble|marmol/i.test(q) && /marble/i.test(row.material)) score += 3;
-  if (row.name.toLowerCase().split(/\s+/).some((w) => q.includes(w) && w.length > 3)) score += 2;
+  if (/quartz|cuarzo|calacatta/i.test(q) && /quartz/i.test(row.material)) score += 4;
+  if (/granite|granito/i.test(q) && /granite/i.test(row.material)) score += 4;
+  if (/marble|marmol/i.test(q) && /marble/i.test(row.material)) score += 4;
+  if (/quartzite/i.test(q) && /quartzite/i.test(row.material)) score += 4;
+  if (/dolomite/i.test(q) && /dolomite/i.test(row.material)) score += 4;
 
-  if (requiredSqft != null && row.sqft >= requiredSqft) score += 4;
-  else if (requiredSqft != null && row.sqft >= requiredSqft * 0.7) score += 2;
+  for (const word of row.name.toLowerCase().split(/\s+/)) {
+    if (word.length > 3 && q.includes(word)) score += 2;
+  }
+
+  if (requiredSqft != null && row.sqft >= requiredSqft) score += 5;
+  else if (requiredSqft != null && row.sqft >= requiredSqft * 0.75) score += 2;
+
+  if (row.image_url.includes('vercel-storage.com')) score += 2;
 
   return score;
 }
@@ -64,12 +177,17 @@ function pickOneFullSlab(rows: SmartSlabRow[], query: string, requiredSqft: numb
   const fullSlabs = rows.filter(isFullSlab);
   if (fullSlabs.length === 0) return null;
 
-  const scored = fullSlabs.map((row) => ({ row, score: scoreListing(row, query, requiredSqft) }));
-  const maxScore = Math.max(...scored.map((s) => s.score));
-  const topTier = scored.filter((s) => s.score === maxScore).map((s) => s.row);
+  const scored = fullSlabs
+    .map((row) => ({ row, score: scoreListing(row, query, requiredSqft) }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (requiredSqft != null) {
+        return Math.abs(a.row.sqft - requiredSqft) - Math.abs(b.row.sqft - requiredSqft);
+      }
+      return b.row.sqft - a.row.sqft;
+    });
 
-  const pool = topTier.length > 0 ? topTier : fullSlabs;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return scored[0]?.row ?? null;
 }
 
 async function fetchFromSupabase(): Promise<SmartSlabRow[]> {
@@ -85,7 +203,7 @@ async function fetchFromSupabase(): Promise<SmartSlabRow[]> {
     try {
       const url = new URL(`${ssUrl}/rest/v1/${table}`);
       url.searchParams.set('select', '*');
-      url.searchParams.set('limit', '24');
+      url.searchParams.set('limit', '48');
       const res = await fetch(url.toString(), {
         headers: { apikey: ssKey, Authorization: `Bearer ${ssKey}` },
       });
@@ -99,38 +217,46 @@ async function fetchFromSupabase(): Promise<SmartSlabRow[]> {
 }
 
 async function fetchFromApi(query: string): Promise<SmartSlabRow[]> {
-  const apiUrl = Deno.env.get('SMARTSLAB_API_URL') || 'https://smart-slab-app.vercel.app';
-  try {
-    const res = await fetch(`${apiUrl}/api/listings?limit=24&q=${encodeURIComponent(query)}`);
-    if (res.ok) {
+  const apiUrl = (Deno.env.get('SMARTSLAB_API_URL') || APP_ORIGIN).replace(/\/$/, '');
+  const apiKey = Deno.env.get('SMARTSLAB_API_KEY');
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  const params = new URLSearchParams({ limit: '48', q: query, type: 'full_slab' });
+
+  for (const path of API_PATHS) {
+    try {
+      const res = await fetch(`${apiUrl}${path}?${params.toString()}`, { headers });
+      if (!res.ok) continue;
       const data = await res.json();
-      const rows = data.listings || data.data || data;
-      if (Array.isArray(rows) && rows.length > 0) return rows.map(normalizeRow);
-    }
-  } catch { /* fallback */ }
+      const rows = extractListingRows(data);
+      if (rows.length > 0) return rows.map(normalizeRow);
+    } catch { /* try next path */ }
+  }
+
   return [];
 }
 
-/** Returns 0 or 1 full slab — filtered by query/dimensions, random among top matches. */
+/** Returns 0 or 1 full slab — browse feed first, then JSON API, Supabase, fallback. */
 export async function searchSmartSlabListings(
   query: string,
   _limit = 1,
   requiredSqft: number | null = null,
 ): Promise<SmartSlabRow[]> {
-  const fromDb = await fetchFromSupabase();
-  if (fromDb.length > 0) {
-    const pick = pickOneFullSlab(fromDb, query, requiredSqft);
-    return pick ? [pick] : [];
+  const sources = [
+    await fetchFromBrowseFeed(),
+    await fetchFromApi(query),
+    await fetchFromSupabase(),
+    FALLBACK_FULL_SLABS,
+  ];
+
+  for (const rows of sources) {
+    if (rows.length === 0) continue;
+    const pick = pickOneFullSlab(rows, query, requiredSqft);
+    if (pick) return [pick];
   }
 
-  const fromApi = await fetchFromApi(query);
-  if (fromApi.length > 0) {
-    const pick = pickOneFullSlab(fromApi, query, requiredSqft);
-    return pick ? [pick] : [];
-  }
-
-  const pick = pickOneFullSlab(FALLBACK_FULL_SLABS, query, requiredSqft);
-  return pick ? [pick] : [];
+  return [];
 }
 
 export function noSlabAdvisorMessage(lang: string): string {
