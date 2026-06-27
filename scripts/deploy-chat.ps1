@@ -17,6 +17,11 @@ Write-Host "Listo:" -ForegroundColor Green
 Write-Host "  chat: https://nchzvkvinhpnowopqbfb.supabase.co/functions/v1/chat"
 Write-Host "  edit-kitchen-photo: https://nchzvkvinhpnowopqbfb.supabase.co/functions/v1/edit-kitchen-photo"
 Write-Host ""
-Write-Host "Secrets requeridos: REPLICATE_API_TOKEN (opcional: STABILITY_API_KEY)" -ForegroundColor Yellow
+Write-Host "Secrets requeridos:" -ForegroundColor Yellow
+Write-Host "  OPENAI_API_KEY, REPLICATE_API_TOKEN"
+Write-Host "  VITE_CLOUDINARY_CLOUD_NAME + VITE_CLOUDINARY_UPLOAD_PRESET (o CLOUDINARY_* aliases)"
+Write-Host "  STABILITY_API_KEY (opcional, fallback edicion)"
+Write-Host ""
+Write-Host "Verificar: powershell -ExecutionPolicy Bypass -File scripts/verify-secrets.ps1" -ForegroundColor Cyan
 
 Pop-Location
