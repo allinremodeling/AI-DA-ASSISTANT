@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "npm:@supabase/server";
 import { searchAnalysisContext, searchInspirationReferences, matchPortfolio, ALLIN_PORTFOLIO } from "../_shared/trends.ts";
+import { extractDesignKeywords } from "../_shared/keywords.ts";
 import { analyzeImageWithOpenAI } from "../_shared/vision.ts";
 import { matchEcosystemServices } from "../_shared/ecosystem.ts";
 import { searchSmartSlabListings } from "../_shared/smartslab.ts";
@@ -72,18 +73,28 @@ export default {
         message.match(/cuarzo|quartz|gabinete|cabinet|shaker|encimera|counter|calacatta|granite|granito|vanity|isla|island/i)?.[0]
         || message.slice(0, 40);
 
-      const inspirationQuery = `${contextQuery} ${productQuery} design inspiration trends`.slice(0, 500);
+      const designKeywords = extractDesignKeywords(message, visionAnalysis, fullContext);
 
-      const [analysisWeb, inspirationWeb, smartslabListings, products, portfolio] = await Promise.all([
+      const [analysisWeb, smartslabListings, products, portfolio] = await Promise.all([
         searchAnalysisContext(contextQuery, searchDate, lang),
-        searchInspirationReferences(inspirationQuery, lang),
         searchSmartSlabListings(contextQuery, 1, dimensions.requiredSqft),
         searchProducts(ctx.supabaseAdmin, productQuery),
         Promise.resolve(matchPortfolio(contextQuery, 1)),
       ]);
 
-      const services = matchEcosystemServices(`${message} ${visionAnalysis}`, 4);
       const portfolioItem = portfolio[0] || ALLIN_PORTFOLIO[0];
+      const inspirationExcludeUrls = [
+        String((products[0] as Record<string, unknown> | undefined)?.image_url || ''),
+        portfolioItem.imageUrl,
+      ].filter(Boolean);
+
+      const inspirationWeb = await searchInspirationReferences(contextQuery, lang, {
+        keywords: designKeywords,
+        excludeUrls: inspirationExcludeUrls,
+        lang,
+      });
+
+      const services = matchEcosystemServices(`${message} ${visionAnalysis}`, 4);
 
       const { intro, blocks, followUp } = await orchestrateChatResponse({
         message,

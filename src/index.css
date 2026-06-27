@@ -24,6 +24,7 @@ body {
   color: #1a1a1a;
   background: #ffffff;
   overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .login-shell {
@@ -101,6 +102,21 @@ html {
 
 .chat-safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.chat-scroll {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-touch-target {
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  .chat-input-text {
+    font-size: 16px;
+  }
 }
 
 .font-serif {

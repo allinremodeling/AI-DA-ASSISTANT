@@ -44,12 +44,38 @@ Cada consulta genera **5 tarjetas** dentro del chat. La IA primero muestra un in
 | # | Card | Fuente | Descripción |
 |---|------|--------|-------------|
 | 1 | **Analysis** | IA + imagen + web | Confirma que AI-DA entendió el proyecto; parafrasea la intención del usuario e incorpora contexto de tendencias actuales |
-| 2 | **Inspiration** | Tavily web search | Referencias estilo Pinterest/Houzz/ArchDaily embebidas en el chat — sin salir de la app |
+| 2 | **Inspiration** | Tavily + keywords del análisis | Imagen **externa** (Houzz/Pinterest/web) según palabras clave destacadas — nunca repite la foto de recomendación All In |
 | 3 | **AI-DA Recommendation** | Catálogo ALL IN | Servicios y productos específicos de All In Remodeling y All In Builders relevantes al proyecto |
 | 4 | **Smart Slab Marketplace** | SmartSlab API en tiempo real | Slabs disponibles filtrados por material, color, acabado y dimensiones detectadas |
 | 5 | **Plan de acción** | CTA ALL IN | Pasos concretos + botones para cotización, llamada y consulta con asesor |
 
 Objetivo: el usuario debe sentir que AI-DA **entendió su proyecto, investigó en Internet, encontró inspiración real, verificó el inventario** y lo conectó con un asesor All In.
+
+---
+
+## UI/UX — mobile y desktop
+
+Optimizado para tráfico desde **redes sociales e in-app browsers** (Instagram, Facebook, Safari/Chrome móvil):
+
+| Área | Comportamiento |
+|------|----------------|
+| **Viewport** | `100dvh` + `viewport-fit=cover` + safe-area en input |
+| **Express landing** | Primera pantalla sin login; contador 3 turnos visible |
+| **Touch** | Botones ≥44px, `font-size: 16px` en input (evita zoom iOS), scroll suave con `overscroll-behavior` |
+| **Tarjetas** | Grid 1 col móvil / 2 col desktop; badges “Inspiración web” vs “All In” |
+| **Imágenes** | Placeholder si URL rota; inspiración y recomendación visualmente distintas |
+| **Intro / follow-up** | Markdown `**negritas**` renderizado en welcome y refinamiento express |
+
+---
+
+## Inspiración web (Card 2)
+
+1. Extrae **keywords** del mensaje, visión OpenAI y tokens `**destacados**` del análisis (`keywords.ts`).
+2. Busca en Tavily con queries orientadas a Houzz/Pinterest/fotos de interiores.
+3. **Excluye** URLs de portfolio All In y la imagen de la Card 3 (recomendación).
+4. Fallback: banco de imágenes externas (Unsplash) emparejadas por estilo — no portfolio All In.
+
+Requiere `TAVILY_API_KEY` en Supabase para resultados web en vivo.
 
 ---
 
@@ -125,7 +151,7 @@ npm run deploy:cpanel
 ```
 
 Sube **`deploy-cpanel-ai.zip`** a cPanel → `public_html/ai/` → Extract.  
-Build actual: `assets/index-CFSiB-ZW.js`.
+Build actual: `assets/index-DgQqzdfy.js`.
 
 ### Verificar
 
@@ -156,6 +182,8 @@ npx netlify dev          # Solo si usas Netlify functions en local
 Merge del **Prompt Maestro AI-DA** — rediseño completo del flujo de respuesta:
 
 - **Consulta express (3 turnos)**: landing sin login; historial conversacional para refinar diseño antes de crear cuenta
+- **UI/UX mobile + desktop**: safe-area, touch targets, avatares consistentes, intro/follow-up con negritas
+- **Inspiración web única**: búsqueda Tavily por keywords del análisis; sin duplicar imagen de recomendación All In
 - **5 Cards**: Analysis, Inspiration, AI-DA Recommendation, Smart Slab (1 full slab), Action Plan con CTAs All In
 - **Detección de idioma**: `navigator.language` → `lang` en todo el pipeline Edge Function
 - **OpenAI Vision** (`gpt-4o-mini`) para análisis de fotos

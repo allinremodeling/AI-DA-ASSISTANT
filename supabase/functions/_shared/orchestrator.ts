@@ -1,6 +1,7 @@
 import { buildActionPlanSteps } from './ecosystem.ts';
 import { noSlabAdvisorMessage, type SmartSlabRow } from './smartslab.ts';
 import type { TrendResult } from './trends.ts';
+import { pickUniqueInspiration, normalizeUrlKey } from './trends.ts';
 import type { ProjectDimensions } from './dimensions.ts';
 import type { ChatHistoryTurn } from './history.ts';
 import { guestRefinementFollowUp, guestTurnsRemaining } from './history.ts';
@@ -56,8 +57,29 @@ function marketplaceBlockText(ctx: OrchestratorContext): string {
   };
   return templates[ctx.lang] || templates.en;
 }
+
+function recommendationImageCandidates(ctx: OrchestratorContext, gptUrl?: string): string[] {
+  const p = ctx.products[0] as Record<string, unknown> | undefined;
+  return [gptUrl, String(p?.image_url || ''), ctx.portfolioItem.imageUrl].filter(Boolean) as string[];
+}
+
+function pickRecommendationImage(candidates: string[], inspirationUrl?: string): string | undefined {
+  const inspKey = inspirationUrl ? normalizeUrlKey(inspirationUrl) : '';
+  for (const url of candidates) {
+    if (!inspKey || normalizeUrlKey(url) !== inspKey) return url;
+  }
+  return candidates[0];
+}
+
 function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
-  const insp = ctx.inspirationWeb[0] || ctx.portfolioItem;
+  const exclude = recommendationImageCandidates(ctx);
+  const inspRef = pickUniqueInspiration(ctx.inspirationWeb, exclude) || ctx.inspirationWeb[0];
+  const insp = inspRef || {
+    title: ctx.lang === 'es' ? 'Inspiración para tu espacio' : 'Inspiration for your space',
+    text: ctx.lang === 'es' ? 'Referencias de diseño actuales para tu proyecto.' : 'Current design references for your project.',
+    imageUrl: '',
+    source: 'Web',
+  };
   const rec = ctx.products[0] as Record<string, unknown> | undefined;
   const serviceLine = ctx.services.map((s) => s.name).join(', ') || 'Virtual consultation, cabinets, countertops';
 
@@ -84,7 +106,9 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
       text: rec
         ? `${rec.description || 'Product from All In Remodeling catalog.'} Services: ${serviceLine}.`
         : `All In Remodeling and All In Builders can help with: ${serviceLine}.`,
-      imageUrl: rec ? String(rec.image_url || ctx.portfolioItem.imageUrl) : ctx.portfolioItem.imageUrl,
+      imageUrl: rec
+        ? pickRecommendationImage([String(rec.image_url || ''), ctx.portfolioItem.imageUrl], insp.imageUrl)
+        : pickRecommendationImage([ctx.portfolioItem.imageUrl], insp.imageUrl),
       source: 'All In Remodeling · All In Builders',
       tags: ['recommendation'],
     },
@@ -192,7 +216,7 @@ CRITICAL RULES:
 2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
 3. Provide exactly 4 blocks with types in order: analysis, inspiration, recommendation, marketplace (action_plan is injected by us — omit it).
 4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Wrap important keywords in **double asterisks** (materials, room type, style, colors, dimensions) so they render bold — e.g. **cuarzo Calacatta**, **cocina**, **isla**.
-5. CARD 2 inspiration: Short trend reference text from inspirationWeb. We inject imageUrl server-side from inspirationWeb — do NOT invent image URLs in JSON.
+5. CARD 2 inspiration: Short trend reference from inspirationWeb. Server injects a unique external imageUrl from web search (Houzz/Pinterest-style) based on analysis keywords — do NOT reuse All In portfolio or recommendation images. Do NOT invent image URLs in JSON.
 6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
 7. CARD 4 marketplace: Show exactly ONE full slab from smartslabListings (never remnants). Explain why it fits (material, sq ft, application). If smartslabListings is empty, tell the user in their language that no matching full slab was found and an All In advisor will guide them — point to the action plan below. Do not invent listings.
 8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
@@ -234,6 +258,10 @@ CRITICAL RULES:
       },
     };
 
+    const inspRef = pickUniqueInspiration(ctx.inspirationWeb, recommendationImageCandidates(ctx))
+      || ctx.inspirationWeb[0];
+    const inspirationImageUrl = inspRef?.imageUrl;
+
     blocks = blocks.map((b, i) => {
       const type = ['analysis', 'inspiration', 'recommendation', 'marketplace'][i] || b.type;
       const lang = ctx.lang === 'en' ? 'en' : 'es';
@@ -243,15 +271,18 @@ CRITICAL RULES:
       if (!enriched.text && FALLBACK_TEXTS[type]) enriched.text = FALLBACK_TEXTS[type][lang];
 
       if (type === 'inspiration') {
-        const ref = ctx.inspirationWeb[0];
-        if (ref?.imageUrl) enriched.imageUrl = ref.imageUrl;
-        if (!enriched.source && ref) enriched.source = ref.source;
-        if (!enriched.text && ref) enriched.text = ref.text;
-        if (!enriched.title && ref) enriched.title = ref.title;
+        if (inspRef?.imageUrl) enriched.imageUrl = inspRef.imageUrl;
+        if (!enriched.source && inspRef) enriched.source = inspRef.source;
+        if (!enriched.text && inspRef) enriched.text = inspRef.text;
+        if (!enriched.title && inspRef) enriched.title = inspRef.title;
       }
-      if (type === 'recommendation' && !enriched.imageUrl) {
-        const p = ctx.products[0] as Record<string, unknown> | undefined;
-        enriched.imageUrl = String(p?.image_url || ctx.portfolioItem.imageUrl);
+      if (type === 'recommendation') {
+        const recImage = pickRecommendationImage(
+          recommendationImageCandidates(ctx, enriched.imageUrl),
+          inspirationImageUrl,
+        );
+        if (recImage) enriched.imageUrl = recImage;
+        else delete enriched.imageUrl;
       }
       if (type === 'marketplace') {
         if (ctx.smartslabListings.length === 0) {

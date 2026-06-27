@@ -12,7 +12,7 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 |---------|---------|----------------|
 | GitHub `main` | **V1.5.0** | Repo actualizado |
 | Build local | **V1.5.0** | `deploy-cpanel-ai.zip` en raíz |
-| Asset JS actual | **V1.5.0** | DevTools → `index-CFSiB-ZW.js` |
+| Asset JS actual | **V1.5.0** | DevTools → `index-DgQqzdfy.js` |
 | [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Verificar | Si el JS ≠ `index-CFSiB-ZW.js`, redeploy cPanel |
 
 **Acción requerida:** subir **`deploy-cpanel-ai.zip`** a cPanel y ejecutar `npm run deploy:chat` en Supabase (modo express con 3 turnos requiere backend actualizado).
@@ -29,7 +29,7 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 
 **Archivo listo para subir:** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) (raíz del proyecto — regenerar con `npm run deploy:cpanel`)
 
-**Build actual (2026-06-25):** `assets/index-CFSiB-ZW.js` · `assets/index-QLSpvJ6n.css`
+**Build actual (2026-06-25):** `assets/index-DgQqzdfy.js` · `assets/index-DQN5os9A.css`
 
 ---
 
@@ -120,7 +120,7 @@ Contenido del ZIP:
 
 1. Abre **https://allinremodeling.us/ai/**
 2. **Ctrl + Shift + R** (recarga forzada)
-3. Confirma en DevTools → Sources que cargue **`index-CFSiB-ZW.js`**
+3. Confirma en DevTools → Sources que cargue **`index-DgQqzdfy.js`**
 4. La primera pantalla es **modo express** (sin login): contador **0/3** en el header
 5. Escribe una pregunta (o sube foto de cocina) → recibes 5 tarjetas
 6. Envía un **segundo mensaje** refinando (ej. “prefiero vetas grises”) → GPT debe ajustar con contexto del turno anterior

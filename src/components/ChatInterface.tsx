@@ -25,6 +25,11 @@ import { BrandMark } from './BrandMark'
 const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
 const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\nTienes **3 consultas gratuitas** para describir tu proyecto, subir una foto y afinar el diseño (materiales, estilo, medidas). Al final verás un plan de acción con All In.`
 
+function makeWelcomeMessage(isGuestMode: boolean): ChatMessage {
+  const text = isGuestMode ? WELCOME_GUEST : WELCOME_AUTH
+  return { id: 'welcome', role: 'assistant', content: text, intro: text }
+}
+
 export function ChatInterface({
   mode = 'authenticated',
   onLogout,
@@ -69,12 +74,7 @@ export function ChatInterface({
   useEffect(() => {
     if (isGuest) {
       setThreadIdState('guest_express')
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: WELCOME_GUEST,
-        intro: WELCOME_GUEST,
-      }])
+      setMessages([makeWelcomeMessage(true)])
       return
     }
 
@@ -85,22 +85,12 @@ export function ChatInterface({
       if (saved.length > 0) {
         setMessages(saved)
       } else {
-        setMessages([{
-          id: 'welcome',
-          role: 'assistant',
-          content: WELCOME_AUTH,
-          intro: WELCOME_AUTH,
-        }])
+        setMessages([makeWelcomeMessage(false)])
       }
     } else {
       const newThread = createNewThread()
       setThreadIdState(newThread)
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: WELCOME_AUTH,
-        intro: WELCOME_AUTH,
-      }])
+      setMessages([makeWelcomeMessage(false)])
     }
   }, [isGuest])
 
@@ -190,12 +180,7 @@ export function ChatInterface({
     if (isGuest) return
     const newThread = createNewThread()
     setThreadIdState(newThread)
-    setMessages([{
-      id: 'welcome',
-      role: 'assistant',
-      content: WELCOME_AUTH,
-      intro: WELCOME_AUTH,
-    }])
+    setMessages([makeWelcomeMessage(false)])
     setSidebarOpen(false)
     setThreadList(getThreadList())
   }
@@ -204,12 +189,7 @@ export function ChatInterface({
     setThreadIdState(tid)
     setThreadId(tid)
     const saved = getMessages(tid)
-    setMessages(saved.length > 0 ? saved : [{
-      id: 'welcome',
-      role: 'assistant',
-      content: WELCOME_AUTH,
-      intro: WELCOME_AUTH,
-    }])
+    setMessages(saved.length > 0 ? saved : [makeWelcomeMessage(false)])
     setSidebarOpen(false)
   }
 
@@ -433,10 +413,11 @@ export function ChatInterface({
             {messages.length > 1 && (
               <button
                 onClick={() => {
-                  setMessages([])
-                  saveMessages(threadId, [])
+                  const welcome = makeWelcomeMessage(isGuest)
+                  setMessages([welcome])
+                  if (!isGuest) saveMessages(threadId, [welcome])
                 }}
-                className="p-1.5 hover:bg-[#f5f5f5] rounded-lg transition-colors text-[#6b6b6b]"
+                className="p-2 hover:bg-[#f5f5f5] rounded-lg transition-colors text-[#6b6b6b] chat-touch-target"
                 title="Limpiar chat"
               >
                 <Trash2 className="w-4 h-4" />
@@ -447,7 +428,7 @@ export function ChatInterface({
 
         {/* Messages area */}
         <div
-          className="flex-1 overflow-y-auto custom-scrollbar"
+          className="flex-1 overflow-y-auto custom-scrollbar chat-scroll"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -510,8 +491,8 @@ export function ChatInterface({
                     </div>
                   ) : (
                     <div className="flex gap-2 sm:gap-3 min-w-0">
-                      <div className="hidden sm:flex w-8 h-8 bg-[#111111] rounded-full items-center justify-center flex-shrink-0 mt-1">
-                        <Sparkles className="w-4 h-4 text-white" />
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#111111] rounded-full items-center justify-center flex-shrink-0 mt-0.5 flex">
+                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="text-sm font-medium text-[#111111] mb-1">AI-DA</div>
@@ -535,12 +516,12 @@ export function ChatInterface({
               ))}
 
               {isLoading && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4 text-white" />
+                <div className="flex gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-[#111111] mb-1">All In AI</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-[#111111] mb-1">AI-DA</div>
                     <div className="flex items-center gap-2 text-sm text-[#6b6b6b]">
                       <div className="flex gap-1">
                         <div className="w-2 h-2 bg-[#999999] rounded-full typing-dot" />
@@ -590,7 +571,7 @@ export function ChatInterface({
                         : `Ajusta materiales, estilo o medidas (${guestLimit - guestUserMessages} consulta${guestLimit - guestUserMessages === 1 ? '' : 's'} restante${guestLimit - guestUserMessages === 1 ? '' : 's'})...`
                     : 'Describe tu cocina, sube una foto, o pregunta sobre productos...'
                 }
-                className="w-full px-4 py-3 bg-transparent text-sm text-[#111111] placeholder-[#999999] resize-none focus:outline-none min-h-[48px] max-h-[200px]"
+                className="w-full px-4 py-3 bg-transparent text-sm sm:text-sm chat-input-text text-[#111111] placeholder-[#999999] resize-none focus:outline-none min-h-[52px] max-h-[200px]"
                 rows={1}
                 disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
               />
@@ -598,7 +579,7 @@ export function ChatInterface({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-1.5 hover:bg-[#e5e5e5] rounded-lg transition-colors text-[#6b6b6b]"
+                    className="p-2 hover:bg-[#e5e5e5] rounded-lg transition-colors text-[#6b6b6b] chat-touch-target"
                     title="Subir imagen"
                     disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
                   >
@@ -616,7 +597,7 @@ export function ChatInterface({
                   onClick={handleSend}
                   disabled={(!input.trim() && !imagePreview) || isLoading || (isGuest && guestUserMessages >= guestLimit)}
                   className={cn(
-                    'p-1.5 rounded-lg transition-colors',
+                    'p-2 rounded-lg transition-colors chat-touch-target',
                     (input.trim() || imagePreview) && !isLoading
                       ? 'bg-[#111111] text-white hover:bg-[#333333]'
                       : 'bg-[#e5e5e5] text-[#999999] cursor-not-allowed',

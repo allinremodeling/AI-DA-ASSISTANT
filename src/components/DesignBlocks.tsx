@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Phone, Calendar, ExternalLink, Search, MessageCircle } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Phone, Calendar, ExternalLink, Search, MessageCircle, ImageIcon } from 'lucide-react';
 import type { DesignBlock, Product, SmartSlabListing } from '../lib/types';
 import { BLOCK_SECTION_LABELS } from '../lib/types';
 import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
@@ -53,20 +53,21 @@ export function AssistantMessageBody({
 
   return (
     <div className="space-y-5 sm:space-y-7 min-w-0">
-      <div className="hidden sm:flex items-center gap-2.5 pb-2 border-b border-[#e5e5e5]">
+      <div className="flex items-center gap-2 pb-2 border-b border-[#e5e5e5]">
         <BrandMark size="sm" />
-        <span className="text-[#ccc] text-xs">×</span>
-        <SmartSlabMark size="md" />
+        <span className="text-[#ccc] text-xs hidden sm:inline">×</span>
+        <span className="hidden sm:inline-flex"><SmartSlabMark size="md" /></span>
+        <span className="sm:hidden text-[10px] text-[#999] ml-auto uppercase tracking-wide">All In × SmartSlab</span>
       </div>
 
       {intro && (
         <div className="flex gap-2.5 items-start rounded-xl bg-[#fffaf5] border border-[#fdebd2] px-3 py-2.5 sm:px-4 sm:py-3">
           <Search className="w-4 h-4 shrink-0 mt-0.5" style={{ color: BRAND_COLORS.accent }} />
-          <p className="text-sm text-[#111111] leading-relaxed">{intro}</p>
+          <RichText text={intro} className="text-sm text-[#111111] leading-relaxed" />
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-8 md:gap-x-7 md:gap-y-9 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:gap-x-7 md:gap-y-9 items-start">
         {analysis && (
           <CardSection label={BLOCK_SECTION_LABELS.analysis} accent={BRAND_COLORS.accent}>
             <DesignBlockCard block={analysis} variant="analysis" />
@@ -115,7 +116,10 @@ export function AssistantMessageBody({
       )}
 
       {followUp && (
-        <p className="text-sm text-[#6b6b6b] italic border-t border-[#e5e5e5] pt-4">{followUp}</p>
+        <RichText
+          text={followUp}
+          className="text-sm text-[#6b6b6b] italic border-t border-[#e5e5e5] pt-4 block"
+        />
       )}
     </div>
   );
@@ -145,6 +149,58 @@ function CardSection({
   );
 }
 
+function CardImage({
+  src,
+  alt,
+  variant,
+  source,
+}: {
+  src: string;
+  alt: string;
+  variant: 'inspiration' | 'recommendation';
+  source?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="relative aspect-[4/3] bg-[#f3f3f3] shrink-0 w-full max-h-52 sm:max-h-56">
+      {!failed ? (
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-[#999] px-4">
+          <ImageIcon className="w-8 h-8 opacity-50" />
+          <span className="text-xs text-center">Imagen no disponible</span>
+        </div>
+      )}
+      {variant === 'inspiration' && !failed && (
+        <span className="absolute top-2 left-2 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-sm">
+          Inspiración web
+        </span>
+      )}
+      {variant === 'recommendation' && !failed && (
+        <span
+          className="absolute top-2 left-2 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full text-white backdrop-blur-sm"
+          style={{ backgroundColor: `${BRAND_COLORS.accent}dd` }}
+        >
+          All In
+        </span>
+      )}
+      {source && !failed && variant === 'inspiration' && (
+        <span className="absolute bottom-2 right-2 text-[10px] px-2 py-0.5 rounded bg-black/50 text-white truncate max-w-[70%]">
+          {source}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function DesignBlockCard({
   block,
   variant,
@@ -162,26 +218,23 @@ function DesignBlockCard({
 
   return (
     <article
-      className={`bg-white border rounded-xl overflow-hidden transition-shadow h-full flex flex-col min-w-0 ${
+      className={`bg-white border rounded-xl overflow-hidden transition-shadow h-full flex flex-col min-w-0 scroll-mt-4 ${
         variant === 'analysis'
           ? 'border-[#fdebd2] shadow-sm min-h-[100px]'
           : variant === 'inspiration'
-            ? 'border-[#fdebd2] hover:shadow-md'
-            : 'border-[#e5e5e5] hover:shadow-md'
+            ? 'border-[#dbeafe] hover:shadow-md ring-1 ring-[#eff6ff]'
+            : variant === 'recommendation'
+              ? 'border-[#fdebd2] hover:shadow-md ring-1 ring-[#fff7ed]'
+              : 'border-[#e5e5e5] hover:shadow-md'
       }`}
     >
-      {showImage && imageOnTop && (
-        <div className="aspect-[4/3] bg-[#f9f9f9] shrink-0 w-full max-h-48 sm:max-h-52">
-          <img
-            src={block.imageUrl}
-            alt={block.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        </div>
+      {showImage && imageOnTop && block.imageUrl && (
+        <CardImage
+          src={block.imageUrl}
+          alt={block.title}
+          variant={variant === 'inspiration' ? 'inspiration' : 'recommendation'}
+          source={block.source}
+        />
       )}
       <div className="p-3.5 sm:p-4 space-y-2 flex-1">
         <h4 className="text-sm font-semibold text-[#111111] leading-snug">{block.title}</h4>
