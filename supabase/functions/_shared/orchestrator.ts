@@ -6,6 +6,7 @@ import type { ProjectDimensions } from './dimensions.ts';
 import type { ChatHistoryTurn } from './history.ts';
 import { guestRefinementFollowUp, guestTurnsRemaining } from './history.ts';
 import { completeDesignJSON } from './llm.ts';
+import { AIDA_PERSONALITY, ORCHESTRATOR_JSON_RULES } from './personality.ts';
 
 export interface DesignBlock {
   type: string;
@@ -43,6 +44,7 @@ export interface OrchestratorResult {
   intro: string;
   blocks: DesignBlock[];
   followUp: string;
+  editPhotoPrompt?: string;
 }
 
 function marketplaceBlockText(ctx: OrchestratorContext): string {
@@ -175,38 +177,18 @@ function injectActionPlan(blocks: DesignBlock[], guest: boolean, lang = 'es'): D
   return [...withoutPlan.slice(0, 4), plan];
 }
 
-const ORCHESTRATOR_SYSTEM = `You are AI-DA — a warm, expert virtual design assistant for All In Remodeling, ALL IN Builders (Georgia) and SmartSlab.
+const ORCHESTRATOR_SYSTEM = `${AIDA_PERSONALITY}
 
-VOICE & VALUE:
-- Speak like a real advisor on chat: empathetic, confident, specific — never robotic templates.
-- On refinements ("no me convence", "quiero waterfall"), acknowledge the change explicitly and rebuild advice around the NEW preference.
-- Every card must feel written for THIS user, THIS turn — not copy-paste from prior sessions.
-- Use context.lang for ALL text (intro, blocks, followUp). Never mix English titles with Spanish body.
-
-OUTPUT JSON ONLY: {"intro":"...","blocks":[...],"followUp":"..."}
+${ORCHESTRATOR_JSON_RULES}
 
 STRUCTURE — exactly 4 blocks (types in order): analysis, inspiration, recommendation, marketplace. We inject action_plan separately.
 
-CARD 1 analysis:
-- Open naturally (es: "Perfecto, déjame revisar tu proyecto…" / en: "Great — let me look at your project…").
-- 2 short paragraphs max. Bold key terms with **double asterisks** (materials, waterfall, isla, medidas, estilo).
-- Blend visionAnalysis + userMessage + conversationHistory.
+CARD 1 analysis: 2 short paragraphs, **bold** key materials/styles, blend vision + history.
+CARD 2 inspiration: align with selectedInspiration in context; no imageUrl in JSON.
+CARD 3 recommendation: All In products/services for Georgia — specific and justified.
+CARD 4 marketplace: ONE full slab from smartslabListings or advisor message if empty.
 
-CARD 2 inspiration:
-- Connect visually to analysis keywords (e.g. waterfall → describe that aesthetic).
-- selectedInspiration in context has the image we will show — align your text with that reference.
-- Do NOT include imageUrl in JSON (server injects it). Mention the external source naturally.
-
-CARD 3 recommendation:
-- All In products/services that solve the user's goal (fabrication, waterfall island, cabinets, install).
-- Practical and reassuring — why All In is the right next step in Georgia.
-- imageUrl optional (server may use portfolio/product photo).
-
-CARD 4 marketplace:
-- ONE full slab from smartslabListings — why it fits this project. If empty, explain an advisor will help source stone.
-
-intro: 1-2 conversational sentences — show you're actively working for them.
-followUp: one natural question; if expressTurnsRemaining > 0 invite refinement with count; if 0 invite free account; else offer All In consultation.`;
+followUp: natural question; expressTurnsRemaining in context — on last turn invite free account.`;
 
 function finalizeBlocks(
   blocks: DesignBlock[],
@@ -276,6 +258,7 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
     services: ctx.services,
     smartslabListings: ctx.smartslabListings,
     portfolio: ctx.portfolioItem,
+    editPhotoAvailable: ctx.hasImage && Boolean(Deno.env.get('REPLICATE_API_TOKEN')),
     expressTurnsRemaining: ctx.guest
       ? guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3)
       : null,
@@ -303,12 +286,17 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
       ? 'Listo — organicé todo para que veas análisis, inspiración visual, recomendación All In y tu slab en SmartSlab.'
       : 'Done — I organized analysis, visual inspiration, All In recommendation, and your SmartSlab match.';
 
+    const editPhotoPrompt = typeof parsed.editPhoto?.prompt === 'string'
+      ? parsed.editPhoto.prompt.trim()
+      : undefined;
+
     return {
       intro: parsed.intro || defaultIntro,
       blocks,
       followUp: parsed.followUp || (ctx.guest
         ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
         : (ctx.lang === 'es' ? '¿Te gustaría que un asesor All In revise esto contigo en una consulta gratuita?' : 'Would you like an All In advisor to review this with you in a free consultation?')),
+      editPhotoPrompt: editPhotoPrompt || undefined,
     };
   } catch (err) {
     console.error('Orchestrator fallback', err);

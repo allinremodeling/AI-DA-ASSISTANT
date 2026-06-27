@@ -1,10 +1,12 @@
+import { AIDA_PERSONALITY } from './personality.ts';
+
 function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
   const match = dataUrl.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/i);
   if (!match) return null;
   return { mediaType: match[1].toLowerCase(), data: match[2] };
 }
 
-/** Short image analysis via OpenAI Vision (uses OPENAI_API_KEY, no Claude required). */
+/** Kitchen photo analysis via OpenAI Vision — AI-DA consultant tone. */
 export async function analyzeImageWithOpenAI(
   imageBase64: string,
   userMessage: string,
@@ -19,6 +21,13 @@ export async function analyzeImageWithOpenAI(
   const parsed = parseDataUrl(imageBase64);
   if (!parsed) return '';
 
+  const photoRules = `
+${AIDA_PERSONALITY}
+
+For this photo analysis only: describe cabinets (style/color), countertops, backsplash, layout, lighting, appliances.
+Identify 2–3 improvement opportunities. Name specific All In materials (White Shaker, Calacatta quartz, waterfall island, etc.).
+If under construction, say so and focus on finish selections. Be warm and detailed — never generic.`;
+
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -28,21 +37,18 @@ export async function analyzeImageWithOpenAI(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 500,
+        max_tokens: 650,
+        temperature: 0.75,
         messages: [{
           role: 'user',
           content: [
             {
               type: 'image_url',
-              image_url: { url: `data:${parsed.mediaType};base64,${parsed.data}`, detail: 'low' },
+              image_url: { url: `data:${parsed.mediaType};base64,${parsed.data}`, detail: 'high' },
             },
             {
               type: 'text',
-              text: `Eres un diseñador senior de cocinas y baños en All In Remodeling (Georgia).
-Consulta del usuario: "${userMessage}"
-Responde en ${languageHint}, tono cercano de asistente virtual (no robótico).
-Análisis breve en 4-6 líneas: tipo de espacio, gabinetes, encimeras, colores, iluminación, y 2-3 ideas concretas de mejora visibles en la foto.
-Destaca materiales y estilos que el usuario podría querer (waterfall, isla, cuarzo, etc.).`,
+              text: `${photoRules}\n\nUser query: "${userMessage}"\nRespond in ${languageHint}.`,
             },
           ],
         }],
@@ -62,7 +68,6 @@ Destaca materiales y estilos que el usuario podría querer (waterfall, isla, cua
   }
 }
 
-/** @deprecated Use analyzeImageWithOpenAI */
 export async function analyzeImageWithClaude(imageBase64: string, userMessage: string, lang = 'es'): Promise<string> {
   return analyzeImageWithOpenAI(imageBase64, userMessage, lang);
 }

@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.chat]
 verify_jwt = false
+
+[functions.edit-kitchen-photo]
+verify_jwt = false

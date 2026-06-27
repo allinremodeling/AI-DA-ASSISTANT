@@ -66,6 +66,8 @@ export interface StructuredChatResponse {
   smartslabListings?: SmartSlabListing[]
   followUp?: string
   generatedImage?: string
+  originalImage?: string
+  editPhotoApplied?: boolean
 }
 
 export interface ChatMessage {
@@ -80,6 +82,8 @@ export interface ChatMessage {
   imageUrl?: string
   imageUrls?: string[]
   generatedImage?: string
+  originalImage?: string
+  editPhotoApplied?: boolean
   isLoading?: boolean
   isError?: boolean
 }

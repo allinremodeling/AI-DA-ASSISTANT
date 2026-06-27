@@ -13,10 +13,12 @@ import {
   MessageSquare,
   Wand2,
   LogOut,
+  Info,
 } from 'lucide-react'
 import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/utils'
 import { sendChatMessage, getGuestMessageLimit, buildConversationHistory } from '../lib/chatService'
+import { getExpressCount, incrementExpressCount } from '../lib/expressStorage'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
 import { BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
@@ -75,6 +77,7 @@ export function ChatInterface({
     if (isGuest) {
       setThreadIdState('guest_express')
       setMessages([makeWelcomeMessage(true)])
+      setGuestUserMessages(getExpressCount())
       return
     }
 
@@ -158,7 +161,7 @@ export function ChatInterface({
       saveMessages(threadId, final)
     }
     if (isGuest) {
-      setGuestUserMessages((c) => c + 1)
+      setGuestUserMessages(incrementExpressCount())
     }
     setIsLoading(false)
 
@@ -503,6 +506,8 @@ export function ChatInterface({
                           products={message.products}
                           smartslabListings={message.smartslabListings}
                           generatedImage={message.generatedImage}
+                          originalImage={message.originalImage}
+                          editPhotoApplied={message.editPhotoApplied}
                         />
                         {!message.blocks?.length && (
                           <p className="text-sm text-[#111111] leading-relaxed whitespace-pre-wrap">
@@ -517,18 +522,20 @@ export function ChatInterface({
 
               {isLoading && (
                 <div className="flex gap-2 sm:gap-3">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
                     <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-[#111111] mb-1">AI-DA</div>
-                    <div className="flex items-center gap-2 text-sm text-[#6b6b6b]">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-[#999999] rounded-full typing-dot" />
-                        <div className="w-2 h-2 bg-[#999999] rounded-full typing-dot" />
-                        <div className="w-2 h-2 bg-[#999999] rounded-full typing-dot" />
+                    <div className="rounded-xl border border-[#fdebd2] bg-[#fffaf5] px-3 py-2.5 sm:px-4 sm:py-3">
+                      <div className="flex items-center gap-2 text-sm text-[#6b6b6b]">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 rounded-full typing-dot" style={{ backgroundColor: BRAND_COLORS.accent }} />
+                          <div className="w-2 h-2 rounded-full typing-dot" style={{ backgroundColor: BRAND_COLORS.accent, opacity: 0.7 }} />
+                          <div className="w-2 h-2 rounded-full typing-dot" style={{ backgroundColor: BRAND_COLORS.accent, opacity: 0.4 }} />
+                        </div>
+                        <span className="text-xs sm:text-sm font-medium text-[#444]">{loadingText}</span>
                       </div>
-                      <span className="text-xs">{loadingText}</span>
                     </div>
                   </div>
                 </div>
@@ -576,15 +583,26 @@ export function ChatInterface({
                 disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
               />
               <div className="flex items-center justify-between px-3 pb-3">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 hover:bg-[#e5e5e5] rounded-lg transition-colors text-[#6b6b6b] chat-touch-target"
-                    title="Subir imagen"
+                    title="Subir foto de tu cocina"
+                    aria-label="Subir foto de tu cocina"
                     disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
                   >
                     <ImagePlus className="w-4 h-4" />
                   </button>
+                  <span
+                    className="relative group p-1.5 text-[#999] hover:text-[#666] cursor-help chat-touch-target"
+                    title="Sube una foto de tu cocina y pídele a AI-DA que cambie gabinetes, encimeras o estilo"
+                    aria-label="Info: sube una foto para analizar y editar tu cocina"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-2.5 py-2 rounded-lg bg-[#111111] text-white text-[10px] leading-snug opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-10 hidden sm:block">
+                      Sube una foto y pide cambios: gabinetes, encimeras, backsplash o estilo
+                    </span>
+                  </span>
                   <input
                     type="file"
                     accept="image/*"

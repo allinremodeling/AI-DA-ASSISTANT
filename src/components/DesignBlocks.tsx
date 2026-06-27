@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Phone, Calendar, ExternalLink, Search, MessageCircle, ImageIcon } from 'lucide-react';
+import { Phone, Calendar, ExternalLink, Search, MessageCircle, ImageIcon, Sparkles } from 'lucide-react';
 import type { DesignBlock, Product, SmartSlabListing } from '../lib/types';
 import { BLOCK_SECTION_LABELS } from '../lib/types';
 import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
@@ -35,6 +35,8 @@ export function AssistantMessageBody({
   products,
   smartslabListings,
   generatedImage,
+  originalImage,
+  editPhotoApplied,
 }: {
   intro?: string;
   blocks?: DesignBlock[];
@@ -42,6 +44,8 @@ export function AssistantMessageBody({
   products?: Product[];
   smartslabListings?: SmartSlabListing[];
   generatedImage?: string;
+  originalImage?: string;
+  editPhotoApplied?: boolean;
 }) {
   const sorted = blocks ? sortBlocks(blocks) : [];
   const actionPlan = sorted.find((b) => b.type === 'action_plan');
@@ -101,7 +105,11 @@ export function AssistantMessageBody({
       )}
 
       {generatedImage && (
-        <img src={generatedImage} alt="Render conceptual" className="rounded-xl max-h-80 w-full object-cover" />
+        <PhotoEditComparison
+          originalImage={originalImage}
+          generatedImage={generatedImage}
+          editPhotoApplied={editPhotoApplied}
+        />
       )}
 
       {products && products.length > 0 && !recommendation && (
@@ -122,6 +130,67 @@ export function AssistantMessageBody({
           text={followUp}
           className="text-sm text-[#6b6b6b] italic border-t border-[#e5e5e5] pt-4 block"
         />
+      )}
+    </div>
+  );
+}
+
+function PhotoEditComparison({
+  originalImage,
+  generatedImage,
+  editPhotoApplied,
+}: {
+  originalImage?: string;
+  generatedImage: string;
+  editPhotoApplied?: boolean;
+}) {
+  const showBefore = Boolean(originalImage);
+
+  return (
+    <div className="rounded-xl border border-[#fdebd2] bg-[#fffaf5] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[#fdebd2]">
+        <Sparkles className="w-4 h-4 shrink-0" style={{ color: BRAND_COLORS.accent }} />
+        <p className="text-xs sm:text-sm font-semibold text-[#111111]">
+          {editPhotoApplied ? 'Visualización AI-DA — antes y después' : 'Visualización conceptual'}
+        </p>
+      </div>
+      <div className={`grid gap-2 p-2 sm:p-3 ${showBefore ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+        {showBefore && (
+          <figure className="min-w-0">
+            <figcaption className="text-[10px] uppercase tracking-wider text-[#999] mb-1.5 px-0.5">Antes</figcaption>
+            <img
+              src={originalImage}
+              alt="Cocina original"
+              className="rounded-lg w-full max-h-64 sm:max-h-72 object-cover border border-[#e5e5e5]"
+              referrerPolicy="no-referrer"
+            />
+          </figure>
+        )}
+        <figure className="min-w-0">
+          <figcaption className="text-[10px] uppercase tracking-wider mb-1.5 px-0.5" style={{ color: BRAND_COLORS.accent }}>
+            {showBefore ? 'Después' : 'Resultado'}
+          </figcaption>
+          <img
+            src={generatedImage}
+            alt="Cocina editada"
+            className="rounded-lg w-full max-h-64 sm:max-h-72 object-cover border border-[#fdebd2] ring-1 ring-[#fdebd2]"
+            referrerPolicy="no-referrer"
+          />
+        </figure>
+      </div>
+      {editPhotoApplied && (
+        <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+          <a
+            href={BRAND.estimate}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold text-white"
+            style={{ backgroundColor: BRAND_COLORS.accent }}
+          >
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            ¿Te encanta? Agenda una cotización gratis
+          </a>
+        </div>
       )}
     </div>
   );

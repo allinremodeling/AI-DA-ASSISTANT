@@ -47,6 +47,8 @@ function structuredToMessage(data: StructuredChatResponse): ChatMessage {
     products: data.products?.length ? data.products : undefined,
     smartslabListings: data.smartslabListings?.length ? data.smartslabListings : undefined,
     generatedImage: data.generatedImage,
+    originalImage: data.originalImage,
+    editPhotoApplied: data.editPhotoApplied,
   };
 }
 
@@ -79,6 +81,15 @@ export async function sendChatMessage(
   onProgress?.('🔎 Ok, déjame analizar tu proyecto...');
 
   const lang = options?.lang || getUserLang();
+  const mayEdit = Boolean(imageBase64) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render/i.test(content);
+
+  let editProgressTimer: ReturnType<typeof setTimeout> | undefined;
+  if (mayEdit) {
+    editProgressTimer = setTimeout(() => onProgress?.('🎨 Visualizando cambios en tu cocina...'), 5000);
+    setTimeout(() => onProgress?.('✨ Afinando detalles del diseño...'), 14000);
+  } else if (imageBase64) {
+    setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 3500);
+  }
 
   try {
     const res = await fetch(CHAT_API, {
@@ -102,9 +113,11 @@ export async function sendChatMessage(
     if (res.ok) {
       onProgress?.('Buscando inspiración y materiales...');
       const data = (await res.json()) as StructuredChatResponse;
+      if (editProgressTimer) clearTimeout(editProgressTimer);
       return structuredToMessage(data);
     }
   } catch {
+    if (editProgressTimer) clearTimeout(editProgressTimer);
     // fall through to local mock
   }
 
