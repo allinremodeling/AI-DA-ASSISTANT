@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "build:cpanel": "tsc -b && vite build --base /ai/",
     "deploy:cpanel": "powershell -ExecutionPolicy Bypass -File scripts/deploy-cpanel.ps1",
-    "deploy:chat": "supabase functions deploy chat",
+    "deploy:chat": "powershell -ExecutionPolicy Bypass -File scripts/deploy-chat.ps1",
     "lint": "oxlint",
     "preview": "vite preview",
     "db:push": "drizzle-kit push",

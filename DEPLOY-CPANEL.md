@@ -1,8 +1,8 @@
 # Despliegue cPanel — allinremodeling.us/ai
 
-Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
+Guía paso a paso para publicar **AI-DA V1.5.1** en tu hosting cPanel.
 
-> Documentación completa de la release: [`docs/V1-5-0.md`](docs/V1-5-0.md)
+> Release actual: [`docs/V1-5-1.md`](docs/V1-5-1.md) · Anterior: [`docs/V1-5-0.md`](docs/V1-5-0.md)
 
 ---
 
@@ -13,9 +13,10 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 | GitHub `main` | **V1.5.1** | Repo actualizado |
 | Build local | **V1.5.1** | `deploy-cpanel-ai.zip` en raíz |
 | Asset JS actual | **V1.5.1** | DevTools → `index-C0Y4eEkv.js` |
-| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Verificar | Si el JS ≠ `index-CFSiB-ZW.js`, redeploy cPanel |
+| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Subir ZIP | Debe cargar `index-C0Y4eEkv.js` |
+| Supabase `chat` | ✅ Tras `npm run deploy:chat` | POST → 200 con `blocks[]` |
 
-**Acción requerida:** subir **`deploy-cpanel-ai.zip`** a cPanel y ejecutar `npm run deploy:chat` (V1.5.1 requiere backend con `llm.ts` + orquestador actualizado).
+**Acción pendiente (solo cPanel):** subir **`deploy-cpanel-ai.zip`** a `public_html/ai/` y extraer. Backend V1.5.1 ya desplegado con `npm run deploy:chat`.
 
 ---
 
@@ -41,7 +42,10 @@ Abre PowerShell en la carpeta del proyecto:
 cd f:\Proyectos\AI-DA-ASSISTANT
 npx supabase login
 npx supabase link --project-ref nchzvkvinhpnowopqbfb
+npm run deploy:chat
 ```
+
+> **Windows:** si PowerShell bloquea `npm` (*execution policy*), `deploy:chat` ya usa `ExecutionPolicy Bypass`. Alternativa: `npm.cmd run deploy:chat`.
 
 Configura los secrets (solo una vez):
 
