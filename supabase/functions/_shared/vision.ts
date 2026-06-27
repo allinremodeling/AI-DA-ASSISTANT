@@ -38,9 +38,11 @@ export async function analyzeImageWithOpenAI(
             },
             {
               type: 'text',
-              text: `You are a senior kitchen/bath designer for All In Remodeling (Georgia).
-User query: "${userMessage}"
-Respond in ${languageHint}. Short analysis only (3-5 bullet points): space type, cabinets, countertops, colors, lighting, 2-3 concrete improvement ideas visible in the photo.`,
+              text: `Eres un diseñador senior de cocinas y baños en All In Remodeling (Georgia).
+Consulta del usuario: "${userMessage}"
+Responde en ${languageHint}, tono cercano de asistente virtual (no robótico).
+Análisis breve en 4-6 líneas: tipo de espacio, gabinetes, encimeras, colores, iluminación, y 2-3 ideas concretas de mejora visibles en la foto.
+Destaca materiales y estilos que el usuario podría querer (waterfall, isla, cuarzo, etc.).`,
             },
           ],
         }],

@@ -473,7 +473,7 @@ export function ChatInterface({
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-5 sm:space-y-6">
+            <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 space-y-5 sm:space-y-6">
               {messages.map((message) => (
                 <div key={message.id} className="group min-w-0">
                   {message.role === 'user' ? (

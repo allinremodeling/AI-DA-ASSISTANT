@@ -5,6 +5,7 @@ import { pickUniqueInspiration, normalizeUrlKey } from './trends.ts';
 import type { ProjectDimensions } from './dimensions.ts';
 import type { ChatHistoryTurn } from './history.ts';
 import { guestRefinementFollowUp, guestTurnsRemaining } from './history.ts';
+import { completeDesignJSON } from './llm.ts';
 
 export interface DesignBlock {
   type: string;
@@ -71,14 +72,27 @@ function pickRecommendationImage(candidates: string[], inspirationUrl?: string):
   return candidates[0];
 }
 
+function localizedTitles(lang: string): Record<string, string> {
+  const es = lang === 'en' ? false : true;
+  return {
+    analysis: es ? 'Tu proyecto — lo que entendemos' : 'Your project — what we understand',
+    inspiration: es ? 'Inspiración para tu espacio' : 'Inspiration for your space',
+    recommendation: es ? 'Recomendación All In' : 'All In recommendation',
+    marketplace: es ? 'Smart Slab — full slab recomendado' : 'Smart Slab — recommended full slab',
+  };
+}
+
 function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
+  const titles = localizedTitles(ctx.lang);
   const exclude = recommendationImageCandidates(ctx);
   const inspRef = pickUniqueInspiration(ctx.inspirationWeb, exclude) || ctx.inspirationWeb[0];
   const insp = inspRef || {
-    title: ctx.lang === 'es' ? 'Inspiración para tu espacio' : 'Inspiration for your space',
-    text: ctx.lang === 'es' ? 'Referencias de diseño actuales para tu proyecto.' : 'Current design references for your project.',
-    imageUrl: '',
-    source: 'Web',
+    title: titles.inspiration,
+    text: ctx.lang === 'es'
+      ? 'Referencias visuales actuales para tu estilo — seleccionadas según tu consulta.'
+      : 'Current visual references for your style — matched to your request.',
+    imageUrl: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=900&q=80',
+    source: 'Unsplash',
   };
   const rec = ctx.products[0] as Record<string, unknown> | undefined;
   const serviceLine = ctx.services.map((s) => s.name).join(', ') || 'Virtual consultation, cabinets, countertops';
@@ -86,11 +100,15 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
   return [
     {
       type: 'analysis',
-      title: 'Your project — our understanding',
+      title: titles.analysis,
       text: ctx.visionAnalysis
-        ? `Based on your photo and message: ${ctx.visionAnalysis.slice(0, 350)}`
-        : `You asked about: "${ctx.message.slice(0, 200)}". ${ctx.dimensionsText}. We found current remodeling context from ${ctx.analysisWeb[0]?.source || 'All In portfolio'}.`,
-      tags: ['AI-DA', 'analysis'],
+        ? (ctx.lang === 'es'
+          ? `Perfecto — revisé tu consulta${ctx.hasImage ? ' y la foto' : ''}. ${ctx.visionAnalysis.slice(0, 380)}`
+          : `Got it — I reviewed your request${ctx.hasImage ? ' and photo' : ''}. ${ctx.visionAnalysis.slice(0, 380)}`)
+        : (ctx.lang === 'es'
+          ? `Entiendo que buscas: "${ctx.message.slice(0, 200)}". ${ctx.dimensionsText}. Contexto actual de remodelación en Georgia.`
+          : `You asked about: "${ctx.message.slice(0, 200)}". ${ctx.dimensionsText}. Current Georgia remodeling context.`),
+      tags: ['AI-DA', 'análisis'],
     },
     {
       type: 'inspiration',
@@ -102,7 +120,7 @@ function buildFallbackBlocks(ctx: OrchestratorContext): DesignBlock[] {
     },
     {
       type: 'recommendation',
-      title: rec ? String(rec.name) : 'All In ecosystem recommendation',
+      title: rec ? String(rec.name) : titles.recommendation,
       text: rec
         ? `${rec.description || 'Product from All In Remodeling catalog.'} Services: ${serviceLine}.`
         : `All In Remodeling and All In Builders can help with: ${serviceLine}.`,
@@ -157,9 +175,86 @@ function injectActionPlan(blocks: DesignBlock[], guest: boolean, lang = 'es'): D
   return [...withoutPlan.slice(0, 4), plan];
 }
 
+const ORCHESTRATOR_SYSTEM = `You are AI-DA — a warm, expert virtual design assistant for All In Remodeling, ALL IN Builders (Georgia) and SmartSlab.
+
+VOICE & VALUE:
+- Speak like a real advisor on chat: empathetic, confident, specific — never robotic templates.
+- On refinements ("no me convence", "quiero waterfall"), acknowledge the change explicitly and rebuild advice around the NEW preference.
+- Every card must feel written for THIS user, THIS turn — not copy-paste from prior sessions.
+- Use context.lang for ALL text (intro, blocks, followUp). Never mix English titles with Spanish body.
+
+OUTPUT JSON ONLY: {"intro":"...","blocks":[...],"followUp":"..."}
+
+STRUCTURE — exactly 4 blocks (types in order): analysis, inspiration, recommendation, marketplace. We inject action_plan separately.
+
+CARD 1 analysis:
+- Open naturally (es: "Perfecto, déjame revisar tu proyecto…" / en: "Great — let me look at your project…").
+- 2 short paragraphs max. Bold key terms with **double asterisks** (materials, waterfall, isla, medidas, estilo).
+- Blend visionAnalysis + userMessage + conversationHistory.
+
+CARD 2 inspiration:
+- Connect visually to analysis keywords (e.g. waterfall → describe that aesthetic).
+- selectedInspiration in context has the image we will show — align your text with that reference.
+- Do NOT include imageUrl in JSON (server injects it). Mention the external source naturally.
+
+CARD 3 recommendation:
+- All In products/services that solve the user's goal (fabrication, waterfall island, cabinets, install).
+- Practical and reassuring — why All In is the right next step in Georgia.
+- imageUrl optional (server may use portfolio/product photo).
+
+CARD 4 marketplace:
+- ONE full slab from smartslabListings — why it fits this project. If empty, explain an advisor will help source stone.
+
+intro: 1-2 conversational sentences — show you're actively working for them.
+followUp: one natural question; if expressTurnsRemaining > 0 invite refinement with count; if 0 invite free account; else offer All In consultation.`;
+
+function finalizeBlocks(
+  blocks: DesignBlock[],
+  ctx: OrchestratorContext,
+  inspRef: TrendResult | undefined,
+): DesignBlock[] {
+  const titles = localizedTitles(ctx.lang);
+  const inspirationImageUrl = inspRef?.imageUrl;
+
+  return blocks.map((b, i) => {
+    const type = ['analysis', 'inspiration', 'recommendation', 'marketplace'][i] || b.type;
+    const enriched: DesignBlock = { ...b, type };
+
+    if (!enriched.title || enriched.title === type) {
+      enriched.title = titles[type] || enriched.title;
+    }
+
+    if (type === 'inspiration' && inspRef) {
+      enriched.imageUrl = inspRef.imageUrl;
+      enriched.source = inspRef.source || enriched.source;
+      if (!enriched.text || enriched.text.length < 30) enriched.text = inspRef.text;
+      if (enriched.title === 'Inspiration for your space' || enriched.title === type) {
+        enriched.title = inspRef.title || titles.inspiration;
+      }
+    }
+
+    if (type === 'recommendation') {
+      const recImage = pickRecommendationImage(
+        recommendationImageCandidates(ctx, enriched.imageUrl),
+        inspirationImageUrl,
+      );
+      if (recImage) enriched.imageUrl = recImage;
+      else delete enriched.imageUrl;
+    }
+
+    if (type === 'marketplace') {
+      enriched.text = ctx.smartslabListings.length === 0
+        ? noSlabAdvisorMessage(ctx.lang)
+        : marketplaceBlockText(ctx);
+    }
+
+    return enriched;
+  });
+}
+
 export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise<OrchestratorResult> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  const model = Deno.env.get('OPENAI_CHAT_MODEL') || 'gpt-4o-mini';
+  const inspRef = pickUniqueInspiration(ctx.inspirationWeb, recommendationImageCandidates(ctx))
+    || ctx.inspirationWeb[0];
 
   const contextPayload = {
     userMessage: ctx.message,
@@ -170,8 +265,13 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
     visionAnalysis: ctx.visionAnalysis || null,
     searchDate: ctx.searchDate,
     dimensions: ctx.dimensionsText,
-    analysisWeb: ctx.analysisWeb,
-    inspirationWeb: ctx.inspirationWeb,
+    analysisWeb: ctx.analysisWeb.slice(0, 2),
+    selectedInspiration: inspRef ? {
+      title: inspRef.title,
+      text: inspRef.text,
+      source: inspRef.source,
+    } : null,
+    inspirationWeb: ctx.inspirationWeb.slice(0, 2),
     products: ctx.products.slice(0, 4),
     services: ctx.services,
     smartslabListings: ctx.smartslabListings,
@@ -181,145 +281,46 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
       : null,
   };
 
-  if (!apiKey || apiKey.includes('your-key')) {
-    const blocks = buildFallbackBlocks(ctx);
-    return {
-      intro: ctx.lang === 'es'
-        ? 'Tu consulta AI-DA está lista. Revisa cada sección — el plan de acción al final te conecta con un asesor All In.'
-        : 'Your AI-DA consultation is ready. Review each section — the action plan at the end connects you with an All In advisor.',
-      blocks,
-      followUp: ctx.guest
-        ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
-        : (ctx.lang === 'es' ? '¿Listo para agendar una consulta virtual o recibir una cotización?' : 'Ready to schedule a virtual consultation or get a detailed quote?'),
-    };
-  }
-
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 2200,
-        messages: [
-          {
-            role: 'system',
-            content: `You are AI-DA, a professional interior/surface design consultant for ALL IN Builders, All In Remodeling (Georgia) and SmartSlab marketplace.
+    const { content: rawJson } = await completeDesignJSON(
+      ORCHESTRATOR_SYSTEM,
+      JSON.stringify(contextPayload),
+      ctx.history,
+    );
 
-CRITICAL RULES:
-1. Use context.lang — respond ENTIRELY in that language (intro, blocks, followUp). Never switch languages.
-2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
-3. Provide exactly 4 blocks with types in order: analysis, inspiration, recommendation, marketplace (action_plan is injected by us — omit it).
-4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Wrap important keywords in **double asterisks** (materials, room type, style, colors, dimensions) so they render bold — e.g. **cuarzo Calacatta**, **cocina**, **isla**.
-5. CARD 2 inspiration: Short trend reference from inspirationWeb. Server injects a unique external imageUrl from web search (Houzz/Pinterest-style) based on analysis keywords — do NOT reuse All In portfolio or recommendation images. Do NOT invent image URLs in JSON.
-6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
-7. CARD 4 marketplace: Show exactly ONE full slab from smartslabListings (never remnants). Explain why it fits (material, sq ft, application). If smartslabListings is empty, tell the user in their language that no matching full slab was found and an All In advisor will guide them — point to the action plan below. Do not invent listings.
-8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
-9. NEVER reuse the same phrases across different queries. Personalize from userMessage, vision, web data, products, slabs.
-10. intro: 1-2 sentences — user must feel you are actively researching (searchDate in context).
-11. followUp: one short question. If guest express and expressTurnsRemaining > 0, invite the user to refine (materials, colors, layout, budget) and mention how many express turns remain. If expressTurnsRemaining is 0, invite creating a free AI-DA account. Otherwise, ask about scheduling with an All In advisor.
-12. When conversationHistory is non-empty, the latest userMessage is feedback or a refinement — acknowledge what changed vs prior turns and update all cards accordingly. Do not ignore previous context.
-13. For guest express mode turn 2+: explicitly compare the new request with prior turns so the conversation feels fluid and accurate for interior design.`,
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(contextPayload),
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error('Orchestrator error', res.status, await res.text());
-      throw new Error('OpenAI orchestrator failed');
-    }
-
-    const data = await res.json();
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
-
+    const parsed = JSON.parse(rawJson || '{}');
     let blocks: DesignBlock[] = Array.isArray(parsed.blocks) ? parsed.blocks : [];
-
-    const FALLBACK_TITLES: Record<string, Record<string, string>> = {
-      analysis: { es: 'Tu proyecto — lo que entendemos', en: 'Your project — what we understand' },
-      inspiration: { es: 'Inspiración para tu espacio', en: 'Inspiration for your space' },
-      recommendation: { es: 'Recomendación All In', en: 'All In recommendation' },
-      marketplace: { es: 'Smart Slab — full slab recomendado', en: 'Smart Slab — recommended full slab' },
-    };
-    const FALLBACK_TEXTS: Record<string, Record<string, string>> = {
-      recommendation: { es: `Servicios disponibles: ${ctx.services.map((s) => s.name).join(', ')}.`, en: `Available services: ${ctx.services.map((s) => s.name).join(', ')}.` },
-      marketplace: {
-        es: marketplaceBlockText(ctx),
-        en: marketplaceBlockText(ctx),
-      },
-    };
-
-    const inspRef = pickUniqueInspiration(ctx.inspirationWeb, recommendationImageCandidates(ctx))
-      || ctx.inspirationWeb[0];
-    const inspirationImageUrl = inspRef?.imageUrl;
-
-    blocks = blocks.map((b, i) => {
-      const type = ['analysis', 'inspiration', 'recommendation', 'marketplace'][i] || b.type;
-      const lang = ctx.lang === 'en' ? 'en' : 'es';
-      const enriched = { ...b, type };
-
-      if (!enriched.title) enriched.title = FALLBACK_TITLES[type]?.[lang] || type;
-      if (!enriched.text && FALLBACK_TEXTS[type]) enriched.text = FALLBACK_TEXTS[type][lang];
-
-      if (type === 'inspiration') {
-        if (inspRef?.imageUrl) enriched.imageUrl = inspRef.imageUrl;
-        if (!enriched.source && inspRef) enriched.source = inspRef.source;
-        if (!enriched.text && inspRef) enriched.text = inspRef.text;
-        if (!enriched.title && inspRef) enriched.title = inspRef.title;
-      }
-      if (type === 'recommendation') {
-        const recImage = pickRecommendationImage(
-          recommendationImageCandidates(ctx, enriched.imageUrl),
-          inspirationImageUrl,
-        );
-        if (recImage) enriched.imageUrl = recImage;
-        else delete enriched.imageUrl;
-      }
-      if (type === 'marketplace') {
-        if (ctx.smartslabListings.length === 0) {
-          enriched.text = noSlabAdvisorMessage(ctx.lang);
-        } else {
-          enriched.text = marketplaceBlockText(ctx);
-        }
-      }
-      if (type === 'analysis' && (!enriched.text || enriched.text.length < 20)) {
-        enriched.text = ctx.visionAnalysis
-          || `${lang === 'es' ? 'Proyecto' : 'Project'}: "${ctx.message.slice(0, 180)}" — ${ctx.dimensionsText}`;
-      }
-      return enriched;
-    });
 
     if (blocks.length < 4) {
       blocks = buildFallbackBlocks(ctx).slice(0, 4);
+    } else {
+      blocks = finalizeBlocks(blocks.slice(0, 4), ctx, inspRef);
     }
 
     blocks = injectActionPlan(blocks, ctx.guest, ctx.lang);
 
+    const defaultIntro = ctx.lang === 'es'
+      ? 'Listo — organicé todo para que veas análisis, inspiración visual, recomendación All In y tu slab en SmartSlab.'
+      : 'Done — I organized analysis, visual inspiration, All In recommendation, and your SmartSlab match.';
+
     return {
-      intro: parsed.intro || (ctx.lang === 'es' ? 'Análisis completo — revisa cada sección.' : 'Analysis complete — review each section below.'),
+      intro: parsed.intro || defaultIntro,
       blocks,
       followUp: parsed.followUp || (ctx.guest
         ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
-        : (ctx.lang === 'es' ? '¿Te gustaría agendar una consulta virtual gratuita?' : 'Would you like to schedule a free virtual consultation?')),
+        : (ctx.lang === 'es' ? '¿Te gustaría que un asesor All In revise esto contigo en una consulta gratuita?' : 'Would you like an All In advisor to review this with you in a free consultation?')),
     };
   } catch (err) {
     console.error('Orchestrator fallback', err);
-    const blocks = buildFallbackBlocks(ctx);
+    const blocks = injectActionPlan(buildFallbackBlocks(ctx), ctx.guest, ctx.lang);
     return {
-      intro: ctx.lang === 'es' ? 'Tu consulta AI-DA está lista.' : 'Your AI-DA consultation is ready.',
+      intro: ctx.lang === 'es'
+        ? 'Te preparé una respuesta con lo que comentaste — mira cada sección y dime si quieres ajustar algo.'
+        : 'I put together a response based on what you shared — review each section and tell me if you want to adjust anything.',
       blocks,
       followUp: ctx.guest
         ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
-        : (ctx.lang === 'es' ? '¿Te gustaría que un asesor All In te contacte?' : 'Would you like an All In advisor to contact you?'),
+        : (ctx.lang === 'es' ? '¿Quieres que un asesor All In te contacte?' : 'Would you like an All In advisor to reach out?'),
     };
   }
 }

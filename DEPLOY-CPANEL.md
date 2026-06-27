@@ -10,12 +10,12 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 
 | Entorno | Versión | Cómo verificar |
 |---------|---------|----------------|
-| GitHub `main` | **V1.5.0** | Repo actualizado |
-| Build local | **V1.5.0** | `deploy-cpanel-ai.zip` en raíz |
-| Asset JS actual | **V1.5.0** | DevTools → `index-DgQqzdfy.js` |
+| GitHub `main` | **V1.5.1** | Repo actualizado |
+| Build local | **V1.5.1** | `deploy-cpanel-ai.zip` en raíz |
+| Asset JS actual | **V1.5.1** | DevTools → `index-C0Y4eEkv.js` |
 | [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Verificar | Si el JS ≠ `index-CFSiB-ZW.js`, redeploy cPanel |
 
-**Acción requerida:** subir **`deploy-cpanel-ai.zip`** a cPanel y ejecutar `npm run deploy:chat` en Supabase (modo express con 3 turnos requiere backend actualizado).
+**Acción requerida:** subir **`deploy-cpanel-ai.zip`** a cPanel y ejecutar `npm run deploy:chat` (V1.5.1 requiere backend con `llm.ts` + orquestador actualizado).
 
 ---
 
@@ -29,7 +29,7 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 
 **Archivo listo para subir:** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) (raíz del proyecto — regenerar con `npm run deploy:cpanel`)
 
-**Build actual (2026-06-25):** `assets/index-DgQqzdfy.js` · `assets/index-DQN5os9A.css`
+**Build actual (V1.5.1):** `assets/index-C0Y4eEkv.js` · `assets/index-DH6AD-i6.css`
 
 ---
 
@@ -120,7 +120,7 @@ Contenido del ZIP:
 
 1. Abre **https://allinremodeling.us/ai/**
 2. **Ctrl + Shift + R** (recarga forzada)
-3. Confirma en DevTools → Sources que cargue **`index-DgQqzdfy.js`**
+3. Confirma en DevTools → Sources que cargue **`index-C0Y4eEkv.js`**
 4. La primera pantalla es **modo express** (sin login): contador **0/3** en el header
 5. Escribe una pregunta (o sube foto de cocina) → recibes 5 tarjetas
 6. Envía un **segundo mensaje** refinando (ej. “prefiero vetas grises”) → GPT debe ajustar con contexto del turno anterior
@@ -185,7 +185,14 @@ npm run deploy:cpanel
 
 ---
 
-## v1.5.0 — Qué incluye esta versión
+## v1.5.1 — Qué incluye esta versión
+
+- **Asistente virtual** con Anthropic/OpenAI — respuestas fluidas y refinamiento conversacional
+- **Inspiración con imagen completa** — Card 2 siempre con foto web alineada al análisis (waterfall, estilo, materiales)
+- **Consulta express (3 turnos)** + UI mobile/desktop optimizada
+- **5 tarjetas** + plan de acción All In · SmartSlab
+
+## v1.5.0 — histórico
 
 - **Consulta express por defecto** — sin login; **3 turnos** con historial para refinar diseño (materiales, estilo, medidas)
 - **5 tarjetas dinámicas:** análisis → inspiración → recomendación → SmartSlab (1 full slab) → plan con asesor

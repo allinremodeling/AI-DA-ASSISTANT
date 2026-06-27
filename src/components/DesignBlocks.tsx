@@ -84,9 +84,11 @@ export function AssistantMessageBody({
           </CardSection>
         )}
         {marketplace && (
-          <CardSection label={BLOCK_SECTION_LABELS.marketplace} accent={BRAND_COLORS.smartslabCyan}>
-            <IntegratedMarketplaceCard block={marketplace} slab={slab} />
-          </CardSection>
+          <div className="md:col-span-2 min-w-0">
+            <CardSection label={BLOCK_SECTION_LABELS.marketplace} accent={BRAND_COLORS.smartslabCyan}>
+              <IntegratedMarketplaceCard block={marketplace} slab={slab} />
+            </CardSection>
+          </div>
         )}
       </div>
 
@@ -163,14 +165,15 @@ function CardImage({
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="relative aspect-[4/3] bg-[#f3f3f3] shrink-0 w-full max-h-52 sm:max-h-56">
+    <div className="relative w-full bg-[#f3f3f3] shrink-0 overflow-hidden" style={{ minHeight: '180px' }}>
       {!failed ? (
         <img
           src={src}
           alt={alt}
-          className="w-full h-full object-cover"
+          className="w-full h-auto min-h-[180px] max-h-[240px] sm:max-h-[260px] object-cover block"
           loading="lazy"
           decoding="async"
+          referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
         />
       ) : (
@@ -238,7 +241,7 @@ function DesignBlockCard({
       )}
       <div className="p-3.5 sm:p-4 space-y-2 flex-1">
         <h4 className="text-sm font-semibold text-[#111111] leading-snug">{block.title}</h4>
-        {variant === 'analysis' ? (
+        {variant === 'analysis' || variant === 'inspiration' ? (
           <RichText
             text={block.text}
             className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed"
@@ -283,12 +286,13 @@ function IntegratedMarketplaceCard({
     <article className="bg-white border border-[#cceef5] rounded-xl overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col min-w-0">
       {imageUrl ? (
         <a href={slab!.url} target="_blank" rel="noopener noreferrer" className="block shrink-0">
-          <div className="aspect-[16/10] bg-[#f0fafb] w-full max-h-52 sm:max-h-56 relative">
+          <div className="relative w-full bg-[#f0fafb] overflow-hidden" style={{ minHeight: '160px' }}>
             <img
               src={imageUrl}
               alt={slab!.name}
-              className="w-full h-full object-cover"
+              className="w-full h-auto min-h-[160px] max-h-[220px] sm:max-h-[240px] object-cover block"
               loading="lazy"
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://placehold.co/800x500/e8f6f8/00bcd4?text=SmartSlab';
               }}

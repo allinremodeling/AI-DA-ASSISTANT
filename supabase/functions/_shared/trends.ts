@@ -76,6 +76,20 @@ const EXTERNAL_INSPIRATION: (TrendResult & { keywords: string[] })[] = [
     source: 'Unsplash · Farmhouse modern',
     keywords: ['farmhouse', 'shaker', 'warm', 'wood', 'rustic'],
   },
+  {
+    title: 'Waterfall Quartz Island',
+    text: 'Dramatic waterfall edge on a quartz island — continuous stone flow from countertop to floor panel, very requested in premium Georgia kitchens.',
+    imageUrl: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=900&q=80',
+    source: 'Unsplash · Waterfall island',
+    keywords: ['waterfall', 'cascada', 'isla', 'island', 'water fall', 'water-fall'],
+  },
+  {
+    title: 'Waterfall Edge Detail',
+    text: 'Close-up waterfall miter — stone wraps the island side for a seamless luxury look seen on Houzz and Pinterest.',
+    imageUrl: 'https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=900&q=80',
+    source: 'Unsplash · Kitchen detail',
+    keywords: ['waterfall', 'cascada', 'premium', 'luxury', 'edge'],
+  },
 ];
 
 const INTERNAL_HOSTS = ['allinremodeling.us', 'allinbuilders.us', 'smartslab.app'];

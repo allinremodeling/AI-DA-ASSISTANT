@@ -121,7 +121,9 @@ El frontend **no** lleva API keys de OpenAI/Anthropic — solo `VITE_SUPABASE_UR
 
 | Secret | Descripción |
 |--------|-------------|
-| `OPENAI_API_KEY` | **Obligatorio** — visión + orquestador GPT |
+| `ANTHROPIC_API_KEY` | **Recomendado V1.5.1+** — orquestador principal (Claude, tono asistente virtual) |
+| `ANTHROPIC_CHAT_MODEL` | Opcional — default `claude-sonnet-4-20250514` |
+| `OPENAI_API_KEY` | **Obligatorio** — visión + fallback orquestador |
 | `TAVILY_API_KEY` | Búsqueda web de tendencias (recomendado) |
 | `SMARTSLAB_BROWSE_URL` | Opcional — override feed browse (default: smart-slab-app.vercel.app/browse) |
 | `SMARTSLAB_SUPABASE_URL` / `SMARTSLAB_SUPABASE_SECRET_KEY` | Listings SmartSlab (opcional) |
@@ -151,7 +153,7 @@ npm run deploy:cpanel
 ```
 
 Sube **`deploy-cpanel-ai.zip`** a cPanel → `public_html/ai/` → Extract.  
-Build actual: `assets/index-DgQqzdfy.js`.
+Build actual: `assets/index-C0Y4eEkv.js`.
 
 ### Verificar
 
@@ -176,6 +178,13 @@ npx netlify dev          # Solo si usas Netlify functions en local
 ---
 
 ## Changelog
+
+### v1.5.1 — 2026-06-25
+
+- **Asistente virtual fluido**: Anthropic Claude (prioridad) + OpenAI fallback; historial en el LLM para refinamientos naturales
+- **Card 2 inspiración**: imagen siempre visible; búsqueda waterfall/keywords; sin duplicar foto All In
+- **SmartSlab UI**: card ancho completo; imágenes sin recorte al final del chat
+- Docs: [`docs/V1-5-1.md`](docs/V1-5-1.md)
 
 ### v1.5.0 — 2026-06-26
 
