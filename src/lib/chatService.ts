@@ -7,6 +7,9 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const CHAT_API =
   (import.meta.env.VITE_CHAT_API_URL as string | undefined)
   || (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/chat` : '/.netlify/functions/chat');
+const EDIT_API =
+  (import.meta.env.VITE_EDIT_PHOTO_API_URL as string | undefined)
+  || (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/edit-kitchen-photo` : '/.netlify/functions/edit-kitchen-photo');
 const GUEST_MESSAGE_LIMIT = 3;
 
 export interface ChatHistoryTurn {
@@ -34,7 +37,16 @@ export function getUserLang(): string {
   return (navigator.language || 'es').slice(0, 2).toLowerCase();
 }
 
-function structuredToMessage(data: StructuredChatResponse): ChatMessage {
+function isPublicUrl(value?: string): boolean {
+  return Boolean(value && (value.startsWith('http://') || value.startsWith('https://')));
+}
+
+function sanitizeOriginalImage(value?: string): string | undefined {
+  if (!value || !isPublicUrl(value)) return undefined;
+  return value;
+}
+
+function structuredToMessage(data: StructuredChatResponse, userImageUrl?: string): ChatMessage {
   const summary = data.intro || 'Consulta AI-DA completada';
 
   return {
@@ -47,10 +59,51 @@ function structuredToMessage(data: StructuredChatResponse): ChatMessage {
     products: data.products?.length ? data.products : undefined,
     smartslabListings: data.smartslabListings?.length ? data.smartslabListings : undefined,
     generatedImage: data.generatedImage,
-    originalImage: data.originalImage,
+    originalImage: sanitizeOriginalImage(data.originalImage) || sanitizeOriginalImage(userImageUrl),
     editPhotoApplied: data.editPhotoApplied,
+    editPhotoPending: data.shouldEditPhoto && !data.generatedImage,
   };
 }
+
+async function runPhotoEdit(
+  imageData: string,
+  prompt: string,
+  lang: string,
+  onProgress?: (status: string) => void,
+): Promise<{ editedImageUrl?: string; error?: string }> {
+  onProgress?.('🎨 Generando visualización con IA...');
+
+  const isUrl = isPublicUrl(imageData);
+  const res = await fetch(EDIT_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(SUPABASE_ANON_KEY
+        ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
+        : {}),
+    },
+    body: JSON.stringify({
+      ...(isUrl ? { imageUrl: imageData } : { imageBase64: imageData }),
+      prompt,
+      lang,
+    }),
+  });
+
+  if (!res.ok) {
+    return { error: `edit_http_${res.status}` };
+  }
+
+  const data = await res.json() as { editedImageUrl?: string | null; error?: string };
+  if (data.editedImageUrl) {
+    return { editedImageUrl: data.editedImageUrl };
+  }
+  return { error: data.error || 'edit_failed' };
+}
+
+const EDIT_FAILURE_ES =
+  'Estoy teniendo problemas para generar la visualización en este momento. ¿Te gustaría agendar una consulta gratuita para que nuestro diseñador te muestre opciones en persona? Llámanos al **470-733-0461**.';
+const EDIT_FAILURE_EN =
+  "I'm having trouble generating the visualization right now. Would you like to schedule a free consultation so our designer can show you options in person? Call us at **470-733-0461**.";
 
 export async function sendChatMessage(
   _threadId: string,
@@ -59,7 +112,7 @@ export async function sendChatMessage(
   onProgress?: (status: string) => void,
   options?: { guest?: boolean; userMessageCount?: number; lang?: string; history?: ChatHistoryTurn[] },
 ): Promise<ChatMessage> {
-  const isUrl = Boolean(imageData && (imageData.startsWith('http://') || imageData.startsWith('https://')));
+  const lang = options?.lang || getUserLang();
 
   if (options?.guest && (options.userMessageCount ?? 0) >= GUEST_MESSAGE_LIMIT) {
     return {
@@ -82,13 +135,11 @@ export async function sendChatMessage(
 
   onProgress?.('🔎 Ok, déjame analizar tu proyecto...');
 
-  const lang = options?.lang || getUserLang();
-  const mayEdit = Boolean(imageData) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render/i.test(content);
+  const mayEdit = Boolean(imageData) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render|ponle|pon|aplica|material|diseño|design/i.test(content);
 
   let editProgressTimer: ReturnType<typeof setTimeout> | undefined;
   if (mayEdit) {
-    editProgressTimer = setTimeout(() => onProgress?.('🎨 Visualizando cambios en tu cocina...'), 5000);
-    setTimeout(() => onProgress?.('✨ Afinando detalles del diseño...'), 14000);
+    editProgressTimer = setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 4000);
   } else if (imageData) {
     setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 3500);
   }
@@ -104,7 +155,9 @@ export async function sendChatMessage(
       },
       body: JSON.stringify({
         message: content,
-        ...(imageData ? (isUrl ? { imageUrl: imageData } : { imageBase64: imageData }) : {}),
+        ...(imageData
+          ? (isPublicUrl(imageData) ? { imageUrl: imageData } : { imageBase64: imageData })
+          : {}),
         guest: options?.guest ?? false,
         lang,
         history: options?.history?.length ? options.history : undefined,
@@ -116,11 +169,59 @@ export async function sendChatMessage(
       onProgress?.('Buscando inspiración y materiales...');
       const data = (await res.json()) as StructuredChatResponse;
       if (editProgressTimer) clearTimeout(editProgressTimer);
-      return structuredToMessage(data);
+
+      let message = structuredToMessage(data, imageData);
+
+      if (data.shouldEditPhoto && data.editPhotoPrompt && imageData && !data.generatedImage) {
+        onProgress?.('🎨 Visualizando cambios en tu cocina...');
+        editProgressTimer = setTimeout(() => onProgress?.('✨ Afinando detalles del diseño...'), 12000);
+
+        const edit = await runPhotoEdit(imageData, data.editPhotoPrompt, lang, onProgress);
+        if (editProgressTimer) clearTimeout(editProgressTimer);
+
+        if (edit.editedImageUrl) {
+          message = {
+            ...message,
+            generatedImage: edit.editedImageUrl,
+            editPhotoApplied: true,
+            editPhotoPending: false,
+            originalImage: sanitizeOriginalImage(imageData),
+            followUp: options?.guest && (options.userMessageCount ?? 0) + 1 === 2
+              ? (lang === 'es'
+                ? '¿Te gusta cómo se ve? **Crea una cuenta gratis** para guardar este diseño y seguir probando opciones con nuestro diseñador.'
+                : 'Do you like how it looks? **Create a free account** to save this design and keep trying options with our designer.')
+              : message.followUp,
+          };
+        } else {
+          message = {
+            ...message,
+            editPhotoPending: false,
+            followUp: lang === 'es' ? EDIT_FAILURE_ES : EDIT_FAILURE_EN,
+          };
+        }
+      }
+
+      return message;
     }
-  } catch {
+
+    const errBody = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(errBody.error || `HTTP ${res.status}`);
+  } catch (err) {
     if (editProgressTimer) clearTimeout(editProgressTimer);
-    // fall through to local mock
+    if (SUPABASE_URL && CHAT_API.includes('supabase')) {
+      return {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        intro: lang === 'es'
+          ? 'No pude conectar con AI-DA en este momento. Verifica tu conexión e intenta de nuevo.'
+          : 'Could not connect to AI-DA right now. Check your connection and try again.',
+        content: err instanceof Error ? err.message : 'Error',
+        followUp: lang === 'es'
+          ? 'Si el problema continúa, llámanos al **470-733-0461**.'
+          : 'If this persists, call us at **470-733-0461**.',
+      };
+    }
+    // fall through to local mock only when no Supabase configured
   }
 
   onProgress?.('Preparando respuesta...');

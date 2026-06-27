@@ -10,8 +10,7 @@ import { orchestrateChatResponse } from "../_shared/orchestrator.ts";
 import { buildFullConversationContext, guestRefinementFollowUp, type ChatHistoryTurn } from "../_shared/history.ts";
 import {
   buildInpaintPrompt,
-  editKitchenPhoto,
-  editFailureMessage,
+  isPublicImageUrl,
   wantsPhotoEdit,
 } from "../_shared/editPhoto.ts";
 
@@ -125,32 +124,18 @@ export default {
       });
 
       let generatedImage: string | undefined;
-      let originalImage: string | undefined;
-      let editFailed = false;
       let finalFollowUp = followUp;
 
       const shouldEdit = hasImage && imageInput && (
         wantsPhotoEdit(message, true) || Boolean(editPhotoPrompt)
       );
 
-      if (shouldEdit) {
-        originalImage = imageInput;
-        const prompt = editPhotoPrompt || buildInpaintPrompt(message, visionAnalysis, lang);
-        const editResult = await editKitchenPhoto({
-          imageInput,
-          prompt,
-        });
+      const resolvedEditPrompt = shouldEdit
+        ? (editPhotoPrompt || buildInpaintPrompt(message, visionAnalysis, lang))
+        : undefined;
 
-        if (editResult.editedImageUrl) {
-          generatedImage = editResult.editedImageUrl;
-          if (guest && guestTurn === 2) {
-            finalFollowUp = guestRefinementFollowUp(lang, 1, { hasEditedPhoto: true, guestTurn: 2 });
-          }
-        } else {
-          editFailed = true;
-          finalFollowUp = editFailureMessage(lang);
-        }
-      }
+      // Photo edit runs in a second request (edit-kitchen-photo) to avoid timeouts
+      // and oversized JSON responses that crash the browser with base64 echoes.
 
       if (guest && guestTurn === GUEST_TURN_LIMIT && !editFailed) {
         finalFollowUp = guestRefinementFollowUp(lang, 0);
@@ -168,8 +153,10 @@ export default {
               : "Guest mode: create an AI-DA account to continue with an All In advisor.")
             : finalFollowUp,
           generatedImage,
-          originalImage,
+          originalImage: isPublicImageUrl(imageInput) ? imageInput : undefined,
           editPhotoApplied: Boolean(generatedImage),
+          shouldEditPhoto: Boolean(shouldEdit),
+          editPhotoPrompt: resolvedEditPrompt,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -182,4 +169,4 @@ export default {
     }
   }),
 };
-
+

@@ -37,6 +37,7 @@ export function AssistantMessageBody({
   generatedImage,
   originalImage,
   editPhotoApplied,
+  editPhotoPending,
 }: {
   intro?: string;
   blocks?: DesignBlock[];
@@ -46,6 +47,7 @@ export function AssistantMessageBody({
   generatedImage?: string;
   originalImage?: string;
   editPhotoApplied?: boolean;
+  editPhotoPending?: boolean;
 }) {
   const sorted = blocks ? sortBlocks(blocks) : [];
   const actionPlan = sorted.find((b) => b.type === 'action_plan');
@@ -57,11 +59,13 @@ export function AssistantMessageBody({
 
   return (
     <div className="space-y-5 sm:space-y-7 min-w-0">
-      <div className="flex items-center gap-2 pb-2 border-b border-[#e5e5e5]">
-        <BrandMark size="sm" />
-        <span className="text-[#ccc] text-xs hidden sm:inline">×</span>
-        <span className="hidden sm:inline-flex"><SmartSlabMark size="md" /></span>
-        <span className="sm:hidden text-[10px] text-[#999] ml-auto uppercase tracking-wide">All In × SmartSlab</span>
+      <div className="flex items-center gap-2.5 pb-2 border-b border-[#e5e5e5]">
+        <BrandMark size="sm" variant="dark" />
+        <span className="text-[#ccc] text-xs hidden sm:inline shrink-0">×</span>
+        <span className="hidden sm:inline-flex shrink-0"><SmartSlabMark size="md" /></span>
+        <span className="sm:hidden text-[10px] text-[#666] ml-auto uppercase tracking-wide font-medium">
+          All In × SmartSlab
+        </span>
       </div>
 
       {intro && (
@@ -104,11 +108,12 @@ export function AssistantMessageBody({
         </div>
       )}
 
-      {generatedImage && (
+      {(generatedImage || editPhotoPending) && (
         <PhotoEditComparison
           originalImage={originalImage}
           generatedImage={generatedImage}
           editPhotoApplied={editPhotoApplied}
+          editPhotoPending={editPhotoPending}
         />
       )}
 
@@ -139,10 +144,12 @@ function PhotoEditComparison({
   originalImage,
   generatedImage,
   editPhotoApplied,
+  editPhotoPending,
 }: {
   originalImage?: string;
-  generatedImage: string;
+  generatedImage?: string;
   editPhotoApplied?: boolean;
+  editPhotoPending?: boolean;
 }) {
   const showBefore = Boolean(originalImage);
 
@@ -151,7 +158,11 @@ function PhotoEditComparison({
       <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[#fdebd2]">
         <Sparkles className="w-4 h-4 shrink-0" style={{ color: BRAND_COLORS.accent }} />
         <p className="text-xs sm:text-sm font-semibold text-[#111111]">
-          {editPhotoApplied ? 'Visualización AI-DA — antes y después' : 'Visualización conceptual'}
+          {editPhotoPending && !generatedImage
+            ? 'Generando visualización AI-DA…'
+            : editPhotoApplied
+              ? 'Visualización AI-DA — antes y después'
+              : 'Visualización conceptual'}
         </p>
       </div>
       <div className={`grid gap-2 p-2 sm:p-3 ${showBefore ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
@@ -170,12 +181,23 @@ function PhotoEditComparison({
           <figcaption className="text-[10px] uppercase tracking-wider mb-1.5 px-0.5" style={{ color: BRAND_COLORS.accent }}>
             {showBefore ? 'Después' : 'Resultado'}
           </figcaption>
-          <img
-            src={generatedImage}
-            alt="Cocina editada"
-            className="rounded-lg w-full max-h-64 sm:max-h-72 object-cover border border-[#fdebd2] ring-1 ring-[#fdebd2]"
-            referrerPolicy="no-referrer"
-          />
+          {generatedImage ? (
+            <img
+              src={generatedImage}
+              alt="Cocina editada"
+              className="rounded-lg w-full max-h-64 sm:max-h-72 object-cover border border-[#fdebd2] ring-1 ring-[#fdebd2]"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="rounded-lg w-full min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-2 border border-dashed border-[#fdebd2] bg-white">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BRAND_COLORS.accent }} />
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BRAND_COLORS.accent, opacity: 0.6 }} />
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: BRAND_COLORS.accent, opacity: 0.3 }} />
+              </div>
+              <span className="text-xs text-[#666]">Aplicando materiales con Replicate / Stability…</span>
+            </div>
+          )}
         </figure>
       </div>
       {editPhotoApplied && (
@@ -367,7 +389,7 @@ function IntegratedMarketplaceCard({
               }}
             />
             <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
-              <SmartSlabMark size="sm" />
+              <SmartSlabMark size="sm" onLightBg={false} />
               <span className="text-[10px] uppercase tracking-wide text-white font-medium">
                 {slab!.material} · Full slab
               </span>

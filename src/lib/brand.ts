@@ -53,6 +53,9 @@ export function assetUrl(path: string): string {
 }
 
 export const BRAND_ASSETS = {
+  /** Orange isotype — readable on light UI */
+  logoIso: assetUrl('brand/iso.png'),
+  /** Full wordmarks — use on dark surfaces or inside dark containers */
   logoAllIn: assetUrl('brand/allin.png'),
   logoBuildersDark: assetUrl('brand/all-in-builders-black.png'),
   logoBuildersLight: assetUrl('brand/all-in-builders-white.png'),

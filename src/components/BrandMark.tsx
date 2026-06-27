@@ -5,29 +5,75 @@ export function BrandMark({
   variant = 'dark',
 }: {
   size?: 'sm' | 'md' | 'lg'
-  /** dark = black logo on light UI; light = white logo on dark surfaces */
+  /** dark = light UI (iso); light = dark surfaces (full white wordmark) */
   variant?: 'dark' | 'light'
 }) {
-  const heights = { sm: 'h-7', md: 'h-9', lg: 'h-12' }
-  const src = variant === 'light' ? BRAND_ASSETS.logoBuildersLight : BRAND_ASSETS.logoBuildersDark
+  const isoSizes = { sm: 'h-8 w-8', md: 'h-9 w-9', lg: 'h-11 w-11' }
+  const wordmarkHeights = { sm: 'h-7', md: 'h-9', lg: 'h-12' }
+
+  if (variant === 'dark') {
+    return (
+      <img
+        src={BRAND_ASSETS.logoIso}
+        alt={ECOSYSTEM.builders.name}
+        className={`${isoSizes[size]} object-contain shrink-0 rounded-md`}
+      />
+    )
+  }
 
   return (
     <img
-      src={src}
+      src={BRAND_ASSETS.logoBuildersLight}
       alt={ECOSYSTEM.builders.name}
-      className={`${heights[size]} w-auto max-w-[160px] object-contain`}
+      className={`${wordmarkHeights[size]} w-auto max-w-[180px] object-contain`}
     />
   )
 }
 
-export function SmartSlabMark({ size = 'sm' }: { size?: 'sm' | 'md' }) {
-  const heights = { sm: 'h-6', md: 'h-7' }
+export function AllInRemodelingMark({ showLabel = true }: { showLabel?: boolean }) {
   return (
+    <span className="inline-flex items-center gap-2 shrink-0 min-w-0">
+      <img
+        src={BRAND_ASSETS.logoIso}
+        alt={ECOSYSTEM.remodeling.name}
+        className="h-8 w-8 sm:h-9 sm:w-9 object-contain rounded-md shrink-0"
+      />
+      {showLabel && (
+        <span className="hidden sm:flex flex-col leading-none min-w-0">
+          <span className="text-[11px] font-bold tracking-[0.08em] text-[#111111]">ALL IN</span>
+          <span className="text-[9px] font-semibold tracking-[0.14em] text-[#666666] uppercase mt-0.5">
+            Remodeling
+          </span>
+        </span>
+      )}
+    </span>
+  )
+}
+
+export function SmartSlabMark({
+  size = 'sm',
+  onLightBg = true,
+}: {
+  size?: 'sm' | 'md'
+  /** Wrap full logo in dark pill when the app background is white */
+  onLightBg?: boolean
+}) {
+  const heights = { sm: 'h-5', md: 'h-6' }
+
+  const logo = (
     <img
       src={BRAND_ASSETS.logoSmartSlab}
       alt={ECOSYSTEM.smartslab.name}
-      className={`${heights[size]} w-auto max-w-[110px] object-contain`}
+      className={`${heights[size]} w-auto max-w-[96px] object-contain`}
     />
+  )
+
+  if (!onLightBg) return logo
+
+  return (
+    <span className="inline-flex items-center rounded-md bg-[#0a0a0a] px-2 py-1 shrink-0">
+      {logo}
+    </span>
   )
 }
 

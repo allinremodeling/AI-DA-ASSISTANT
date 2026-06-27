@@ -68,6 +68,8 @@ export interface StructuredChatResponse {
   generatedImage?: string
   originalImage?: string
   editPhotoApplied?: boolean
+  shouldEditPhoto?: boolean
+  editPhotoPrompt?: string
 }
 
 export interface ChatMessage {
@@ -84,6 +86,7 @@ export interface ChatMessage {
   generatedImage?: string
   originalImage?: string
   editPhotoApplied?: boolean
+  editPhotoPending?: boolean
   isLoading?: boolean
   isError?: boolean
 }

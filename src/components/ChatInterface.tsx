@@ -21,8 +21,8 @@ import { sendChatMessage, getGuestMessageLimit, buildConversationHistory } from 
 import { getExpressCount, incrementExpressCount } from '../lib/expressStorage'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
-import { BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
-import { BrandMark } from './BrandMark'
+import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
+import { AllInRemodelingMark, BrandMark } from './BrandMark'
 import { uploadToCloudinary, getOptimizedUrl, isCloudinaryConfigured } from '../lib/cloudinary'
 
 const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
@@ -31,6 +31,18 @@ const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\nTienes **3 co
 function makeWelcomeMessage(isGuestMode: boolean): ChatMessage {
   const text = isGuestMode ? WELCOME_GUEST : WELCOME_AUTH
   return { id: 'welcome', role: 'assistant', content: text, intro: text }
+}
+
+function slimMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
+  const keepUrl = (value?: string) =>
+    value && (value.startsWith('http://') || value.startsWith('https://')) ? value : undefined;
+
+  return messages.map((m) => ({
+    ...m,
+    imageUrl: keepUrl(m.imageUrl),
+    originalImage: keepUrl(m.originalImage),
+    generatedImage: keepUrl(m.generatedImage),
+  }));
 }
 
 export function ChatInterface({
@@ -60,6 +72,8 @@ export function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const cloudinaryUrlRef = useRef<string | null>(null)
+  const uploadPromiseRef = useRef<Promise<string | null> | null>(null)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -103,21 +117,23 @@ export function ChatInterface({
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
     setImageCloudinaryUrl(null)
-    // Show local preview immediately
+    cloudinaryUrlRef.current = null
     const reader = new FileReader()
     reader.onload = () => setImagePreview(reader.result as string)
     reader.readAsDataURL(file)
-    // Upload to Cloudinary in background if configured
     if (isCloudinaryConfigured()) {
       setImageUploading(true)
-      uploadToCloudinary(file)
+      uploadPromiseRef.current = uploadToCloudinary(file)
         .then((result) => {
-          setImageCloudinaryUrl(getOptimizedUrl(result.public_id))
+          const url = getOptimizedUrl(result.public_id)
+          cloudinaryUrlRef.current = url
+          setImageCloudinaryUrl(url)
+          return url
         })
-        .catch(() => {
-          // Silently fall back to base64 if upload fails
-        })
+        .catch(() => null)
         .finally(() => setImageUploading(false))
+    } else {
+      uploadPromiseRef.current = null
     }
   }
 
@@ -146,8 +162,19 @@ export function ChatInterface({
   const handleSend = async () => {
     if (!input.trim() && !imagePreview) return
 
-    // Prefer Cloudinary URL (optimized); fall back to base64 if upload isn't done yet
-    const imageToSend = imageCloudinaryUrl || imagePreview || undefined
+    setIsLoading(true)
+    setLoadingText('🔎 Analizando tu proyecto...')
+
+    if (imagePreview && isCloudinaryConfigured() && uploadPromiseRef.current) {
+      setLoadingText('Subiendo foto optimizada…')
+      const uploadedUrl = await Promise.race([
+        uploadPromiseRef.current,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+      ])
+      if (uploadedUrl) cloudinaryUrlRef.current = uploadedUrl
+    }
+
+    const imageToSend = cloudinaryUrlRef.current || imageCloudinaryUrl || imagePreview || undefined
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
@@ -160,34 +187,44 @@ export function ChatInterface({
     setInput('')
     setImagePreview(null)
     setImageCloudinaryUrl(null)
-    setIsLoading(true)
-    setLoadingText('🔎 Analizando tu proyecto...')
+    cloudinaryUrlRef.current = null
+    uploadPromiseRef.current = null
 
     const userLang = navigator.language.slice(0, 2).toLowerCase()
     const history = isGuest ? buildConversationHistory(messages) : undefined
 
-    const response = await sendChatMessage(
-      threadId,
-      userMessage.content,
-      imageToSend,
-      (status) => setLoadingText(status),
-      { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang, history },
-    )
+    try {
+      const response = await sendChatMessage(
+        threadId,
+        userMessage.content,
+        imageToSend,
+        (status) => setLoadingText(status),
+        { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang, history },
+      )
 
-    const final = [...updated, response]
-    setMessages(final)
-    if (!isGuest) {
-      saveMessages(threadId, final)
-    }
-    if (isGuest) {
-      setGuestUserMessages(incrementExpressCount())
-    }
-    setIsLoading(false)
+      const final = [...updated, response]
+      setMessages(final)
+      if (!isGuest) {
+        saveMessages(threadId, slimMessagesForStorage(final))
+      }
+      if (isGuest) {
+        setGuestUserMessages(incrementExpressCount())
+      }
 
-    if (!isGuest && final.length <= 3 && threadId) {
-      const title = userMessage.content.slice(0, 40) + (userMessage.content.length > 40 ? '...' : '')
-      saveThreadTitle(threadId, title)
-      setThreadList(getThreadList())
+      if (!isGuest && final.length <= 3 && threadId) {
+        const title = userMessage.content.slice(0, 40) + (userMessage.content.length > 40 ? '...' : '')
+        saveThreadTitle(threadId, title)
+        setThreadList(getThreadList())
+      }
+    } catch {
+      setMessages([...updated, {
+        id: `err_${Date.now()}`,
+        role: 'assistant',
+        content: 'Hubo un problema al procesar tu consulta. Por favor intenta de nuevo.',
+        intro: 'Hubo un problema al procesar tu consulta. Por favor intenta de nuevo.',
+      }])
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -400,11 +437,7 @@ export function ChatInterface({
               className="inline-flex items-center shrink-0 hover:opacity-90 transition-opacity"
               title="All In Remodeling"
             >
-              <img
-                src={BRAND_ASSETS.logoAllIn}
-                alt="All In Remodeling"
-                className="h-7 sm:h-8 w-auto max-w-[130px] object-contain"
-              />
+              <AllInRemodelingMark showLabel={!isGuest} />
             </a>
             {isGuest && (
               <>
@@ -498,7 +531,7 @@ export function ChatInterface({
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 space-y-5 sm:space-y-6">
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <div key={message.id} className="group min-w-0">
                   {message.role === 'user' ? (
                     <div className="flex flex-col items-end">
@@ -527,8 +560,14 @@ export function ChatInterface({
                           products={message.products}
                           smartslabListings={message.smartslabListings}
                           generatedImage={message.generatedImage}
-                          originalImage={message.originalImage}
+                          originalImage={
+                            message.originalImage
+                            || [...messages.slice(0, index)].reverse().find(
+                              (m) => m.role === 'user' && m.imageUrl,
+                            )?.imageUrl
+                          }
                           editPhotoApplied={message.editPhotoApplied}
+                          editPhotoPending={message.editPhotoPending}
                         />
                         {!message.blocks?.length && (
                           <p className="text-sm text-[#111111] leading-relaxed whitespace-pre-wrap">
