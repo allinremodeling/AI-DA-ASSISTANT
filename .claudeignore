@@ -4,7 +4,6 @@ deploy-cpanel-ai.zip
 .env
 .env.local
 .env*.local
+*.zip
+supabase/.temp/
 .claude/settings.local.json
-
-# Local Netlify folder
-.netlify

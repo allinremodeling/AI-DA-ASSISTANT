@@ -172,8 +172,11 @@ npm run build            # Netlify legacy (base /)
 npm run build:cpanel     # cPanel allinremodeling.us/ai/
 npm run deploy:cpanel    # build:cpanel + deploy-cpanel-ai.zip
 npm run deploy:chat      # supabase functions deploy chat
+npm run claude           # Claude Code (sesión interactiva)
 npx netlify dev          # Solo si usas Netlify functions en local
 ```
+
+Claude Code en el proyecto: [`docs/CLAUDE-CODE.md`](docs/CLAUDE-CODE.md)
 
 ---
 

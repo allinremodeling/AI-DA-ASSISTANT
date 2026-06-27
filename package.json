@@ -9,6 +9,8 @@
     "build:cpanel": "tsc -b && vite build --base /ai/",
     "deploy:cpanel": "powershell -ExecutionPolicy Bypass -File scripts/deploy-cpanel.ps1",
     "deploy:chat": "powershell -ExecutionPolicy Bypass -File scripts/deploy-chat.ps1",
+    "claude": "claude",
+    "claude:doctor": "claude doctor",
     "lint": "oxlint",
     "preview": "vite preview",
     "db:push": "drizzle-kit push",
@@ -24,6 +26,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.1.195",
     "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^24.13.2",
