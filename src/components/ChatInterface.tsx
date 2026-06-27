@@ -23,6 +23,7 @@ import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages,
 import { AssistantMessageBody } from './DesignBlocks'
 import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { AllInRemodelingMark, BrandMark } from './BrandMark'
+import { MessageErrorBoundary } from './ErrorBoundary'
 import { uploadToCloudinary, getOptimizedUrl, isCloudinaryConfigured } from '../lib/cloudinary'
 import { compressImageFile, revokeObjectUrl, safeImageRef, blobToDataUrl } from '../lib/imageUtils'
 
@@ -120,6 +121,7 @@ export function ChatInterface({
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return
+    revokeObjectUrl(previewObjectUrlRef.current)
     setImageCloudinaryUrl(null)
     cloudinaryUrlRef.current = null
     compressedBlobRef.current = null
@@ -219,9 +221,8 @@ export function ChatInterface({
     setImageCloudinaryUrl(null)
     cloudinaryUrlRef.current = null
     uploadPromiseRef.current = null
-    revokeObjectUrl(previewObjectUrlRef.current)
-    previewObjectUrlRef.current = null
     compressedBlobRef.current = null
+    // Keep blob URLs alive while shown in the user message bubble
 
     const userLang = navigator.language.slice(0, 2).toLowerCase()
     const history = isGuest ? buildConversationHistory(messages) : undefined
@@ -616,22 +617,24 @@ export function ChatInterface({
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="text-sm font-medium text-[#111111] mb-1">AI-DA</div>
-                        <AssistantMessageBody
-                          intro={message.intro}
-                          blocks={message.blocks}
-                          followUp={message.followUp}
-                          products={message.products}
-                          smartslabListings={message.smartslabListings}
-                          generatedImage={message.generatedImage}
-                          originalImage={
-                            message.originalImage
-                            || [...messages.slice(0, index)].reverse().find(
-                              (m) => m.role === 'user' && m.imageUrl,
-                            )?.imageUrl
-                          }
-                          editPhotoApplied={message.editPhotoApplied}
-                          editPhotoPending={message.editPhotoPending}
-                        />
+                        <MessageErrorBoundary>
+                          <AssistantMessageBody
+                            intro={message.intro}
+                            blocks={message.blocks}
+                            followUp={message.followUp}
+                            products={message.products}
+                            smartslabListings={message.smartslabListings}
+                            generatedImage={message.generatedImage}
+                            originalImage={
+                              message.originalImage
+                              || [...messages.slice(0, index)].reverse().find(
+                                (m) => m.role === 'user' && m.imageUrl,
+                              )?.imageUrl
+                            }
+                            editPhotoApplied={message.editPhotoApplied}
+                            editPhotoPending={message.editPhotoPending}
+                          />
+                        </MessageErrorBoundary>
                         {!message.blocks?.length && (
                           <p className="text-sm text-[#111111] leading-relaxed whitespace-pre-wrap">
                             {message.content}

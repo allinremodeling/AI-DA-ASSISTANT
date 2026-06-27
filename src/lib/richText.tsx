@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 
 /** Renders **bold** segments from GPT analysis text. */
 export function RichText({ text, className }: { text: string; className?: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const safe = typeof text === 'string' ? text : String(text ?? '');
+  const parts = safe.split(/(\*\*[^*]+\*\*)/g);
 
   return (
     <p className={className}>
@@ -20,7 +21,20 @@ export function RichText({ text, className }: { text: string; className?: string
   );
 }
 
-/** Optional wrapper for mixed inline content. */
 export function RichInline({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
+
+function formatMoney(value: unknown): string {
+  const n = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+export function formatProductPrice(value: unknown): string {
+  const n = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+  if (!Number.isFinite(n)) return '—';
+  return n.toFixed(2);
+}
+
+export { formatMoney };

@@ -1,4 +1,4 @@
-import type { ChatMessage, StructuredChatResponse } from './types';
+import type { ChatMessage, StructuredChatResponse, DesignBlock, Product, SmartSlabListing } from './types';
 import { matchPortfolio, ALLIN_PORTFOLIO } from './portfolio';
 import { ECOSYSTEM } from './brand';
 import { ensureCloudinaryUrl, isCloudinaryConfigured } from './cloudinary';
@@ -43,6 +43,81 @@ function authHeaders(): Record<string, string> {
   return SUPABASE_ANON_KEY
     ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
     : {};
+}
+
+function normalizeBlocks(blocks: unknown): DesignBlock[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.map((raw, i) => {
+    const b = (raw && typeof raw === 'object' ? raw : {}) as Partial<DesignBlock>;
+    return {
+      type: (b.type || 'analysis') as DesignBlock['type'],
+      title: typeof b.title === 'string' ? b.title : `Sección ${i + 1}`,
+      text: typeof b.text === 'string' ? b.text : '',
+      imageUrl: typeof b.imageUrl === 'string' ? b.imageUrl : undefined,
+      source: typeof b.source === 'string' ? b.source : undefined,
+      tags: Array.isArray(b.tags) ? b.tags.filter((t): t is string => typeof t === 'string') : undefined,
+      steps: Array.isArray(b.steps) ? b.steps : undefined,
+      ctaLabel: typeof b.ctaLabel === 'string' ? b.ctaLabel : undefined,
+      ctaType: b.ctaType,
+    };
+  });
+}
+
+function normalizeProducts(products: unknown): Product[] | undefined {
+  if (!Array.isArray(products) || products.length === 0) return undefined;
+  return products.map((raw) => {
+    const p = (raw && typeof raw === 'object' ? raw : {}) as Partial<Product>;
+    const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price ?? '0'));
+    return {
+      ...p,
+      id: String(p.id ?? ''),
+      sku: String(p.sku ?? ''),
+      name: String(p.name ?? 'Producto'),
+      category: String(p.category ?? ''),
+      description: String(p.description ?? ''),
+      price: Number.isFinite(price) ? price : 0,
+      image_url: String(p.image_url ?? ''),
+      woo_url: p.woo_url ?? null,
+      slug: p.slug ?? null,
+      attributes: p.attributes ?? {},
+      in_stock: Boolean(p.in_stock),
+      created_at: String(p.created_at ?? ''),
+    } as Product;
+  });
+}
+
+function normalizeSlabs(listings: unknown): SmartSlabListing[] | undefined {
+  if (!Array.isArray(listings) || listings.length === 0) return undefined;
+  return listings.map((raw) => {
+    const s = (raw && typeof raw === 'object' ? raw : {}) as Partial<SmartSlabListing>;
+    const price = typeof s.price === 'number' ? s.price : parseFloat(String(s.price ?? '0'));
+    const sqft = typeof s.sqft === 'number' ? s.sqft : parseFloat(String(s.sqft ?? '0'));
+    return {
+      id: String(s.id ?? ''),
+      name: String(s.name ?? 'SmartSlab'),
+      material: String(s.material ?? 'Quartz'),
+      type: (s.type === 'remnant' ? 'remnant' : 'full_slab') as SmartSlabListing['type'],
+      location: String(s.location ?? 'Georgia'),
+      sqft: Number.isFinite(sqft) ? sqft : 0,
+      price: Number.isFinite(price) ? price : 0,
+      image_url: String(s.image_url ?? ''),
+      url: String(s.url ?? ECOSYSTEM.smartslab.browse),
+    };
+  });
+}
+
+function normalizeApiResponse(data: StructuredChatResponse): StructuredChatResponse {
+  return {
+    ...data,
+    intro: typeof data.intro === 'string' ? data.intro : 'Consulta AI-DA completada',
+    followUp: typeof data.followUp === 'string' ? data.followUp : undefined,
+    blocks: normalizeBlocks(data.blocks),
+    products: normalizeProducts(data.products),
+    smartslabListings: normalizeSlabs(data.smartslabListings),
+    generatedImage: safeImageRef(data.generatedImage),
+    originalImage: safeImageRef(data.originalImage),
+    editPhotoPrompt: typeof data.editPhotoPrompt === 'string' ? data.editPhotoPrompt : undefined,
+  };
 }
 
 function structuredToMessage(data: StructuredChatResponse, userImageUrl?: string): ChatMessage {
@@ -121,7 +196,8 @@ export async function fetchChatResponse(
   }
 
   onProgress?.('Buscando inspiración y materiales...');
-  const data = (await res.json()) as StructuredChatResponse;
+  const raw = (await res.json()) as StructuredChatResponse;
+  const data = normalizeApiResponse(raw);
   return structuredToMessage(data, imageData);
 }
 

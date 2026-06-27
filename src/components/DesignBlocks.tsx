@@ -3,7 +3,7 @@ import { Phone, Calendar, ExternalLink, Search, MessageCircle, ImageIcon, Sparkl
 import type { DesignBlock, Product, SmartSlabListing } from '../lib/types';
 import { BLOCK_SECTION_LABELS } from '../lib/types';
 import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
-import { RichText } from '../lib/richText';
+import { RichText, formatMoney, formatProductPrice } from '../lib/richText';
 import { BrandMark, SmartSlabMark } from './BrandMark';
 
 const BLOCK_ORDER = [
@@ -345,7 +345,7 @@ function DesignBlockCard({
             {isExternal ? `Referencia: ${block.source}` : `Fuente: ${block.source}`}
           </p>
         )}
-        {block.tags && block.tags.length > 0 && (
+        {block.tags && Array.isArray(block.tags) && block.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-0.5">
             {block.tags.slice(0, 4).map((tag) => (
               <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-[#f5f5f5] text-[#6b6b6b]">
@@ -416,7 +416,7 @@ function IntegratedMarketplaceCard({
               </p>
             </div>
             <p className="text-base font-bold shrink-0" style={{ color: BRAND_COLORS.smartslabCyan }}>
-              ${slab.price.toLocaleString()}
+              ${formatMoney(slab.price)}
             </p>
           </div>
         )}
@@ -448,11 +448,11 @@ function ActionPlanCard({ block }: { block: DesignBlock }) {
             ALL IN
           </p>
           <h4 className="text-base sm:text-lg font-bold text-[#111111] mt-1">
-            {block.title.includes('All In') ? block.title : 'Hablar con un asesor'}
+            {(block.title && block.title.includes('All In')) ? block.title : 'Hablar con un asesor'}
           </h4>
         </div>
         <p className="text-xs sm:text-sm text-[#6b6b6b] leading-relaxed">{block.text}</p>
-        {block.steps && (
+        {block.steps && Array.isArray(block.steps) && (
           <ol className="space-y-2.5">
             {block.steps.map((s) => (
               <li key={s.step} className="flex gap-3 text-xs sm:text-sm">
@@ -524,7 +524,7 @@ function ProductCard({ product }: { product: Product }) {
         <p className="text-sm font-medium text-[#111111] line-clamp-2">{product.name}</p>
         <p className="text-xs text-[#6b6b6b] mt-1">{product.sku}</p>
         <div className="flex items-center justify-between mt-2 gap-2">
-          <span className="text-sm font-bold text-[#111111]">${product.price.toFixed(2)}</span>
+          <span className="text-sm font-bold text-[#111111]">${formatProductPrice(product.price)}</span>
           <a
             href={product.woo_url || `${ECOSYSTEM.remodeling.shop}`}
             target="_blank"

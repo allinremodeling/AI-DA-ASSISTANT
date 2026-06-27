@@ -168,6 +168,12 @@ function injectActionPlan(blocks: DesignBlock[], guest: boolean, lang = 'es'): D
     tags: ['advisor'],
   };
 
+  if (!plan.title) {
+    plan.title = lang === 'es' ? 'Plan con All In — hablar con un asesor' : 'Plan with All In — talk to an advisor';
+  }
+  if (!plan.text) {
+    plan.text = lang === 'es' ? 'Pasos para concretar tu remodelación.' : 'Steps to finalize your remodel with our team.';
+  }
   plan.steps = buildActionPlanSteps(guest, lang);
   if (!plan.ctaLabel) plan.ctaLabel = guest
     ? (lang === 'es' ? 'Crear cuenta y agendar' : 'Create account & schedule')
