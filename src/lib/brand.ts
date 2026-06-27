@@ -53,6 +53,7 @@ export function assetUrl(path: string): string {
 }
 
 export const BRAND_ASSETS = {
+  logoAllIn: assetUrl('brand/allin.png'),
   logoBuildersDark: assetUrl('brand/all-in-builders-black.png'),
   logoBuildersLight: assetUrl('brand/all-in-builders-white.png'),
   logoSmartSlab: assetUrl('brand/smartslab.png'),
@@ -72,10 +73,12 @@ export const BRAND_COLORS = {
 } as const
 
 export const ADVISOR_CTA = {
-  scheduleVirtual: ECOSYSTEM.remodeling.virtualAppt,
+  scheduleVirtual:
+    'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0DHYhK1FND-tidJmYEvRhhN2n8YQsXy1kZc4mUmezPzDv-Wz2fs-7aG59I-3jdOMwAczRIBMLI',
   freeEstimate: ECOSYSTEM.remodeling.estimate,
   callPhone: `tel:${BRAND.phoneRaw}`,
   whatsApp: `https://wa.me/1${BRAND.phoneRaw}`,
+  whatsAppQuote: `https://wa.me/1${BRAND.phoneRaw}?text=${encodeURIComponent('Hola All In, quiero una cotización gratis para mi proyecto de remodelación.')}`,
   smartslabBrowse: ECOSYSTEM.smartslab.browse,
   buildersContact: ECOSYSTEM.builders.contact,
 } as const

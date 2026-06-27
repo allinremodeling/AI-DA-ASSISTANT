@@ -9,7 +9,22 @@ import { BrandHeader } from './BrandMark'
 const inputClass =
   'w-full px-4 py-3.5 bg-white border border-[#d4d4d4] rounded-xl text-sm text-[#111111] placeholder-[#767676] shadow-sm transition-all focus:outline-none focus:border-[#e85d04] focus:ring-2 focus:ring-[#e85d04]/20'
 
-export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
+function friendlyAuthError(message: string): string {
+  const lower = message.toLowerCase()
+  if (lower.includes('invalid login credentials')) return 'Correo o contraseña incorrectos.'
+  if (lower.includes('email not confirmed')) return 'Confirma tu correo antes de iniciar sesión (revisa tu bandeja).'
+  if (lower.includes('user already registered')) return 'Este correo ya está registrado. Inicia sesión.'
+  if (lower.includes('password') && lower.includes('6')) return 'La contraseña debe tener al menos 6 caracteres.'
+  return message
+}
+
+export default function LoginPage({
+  onGuest,
+  onBack,
+}: {
+  onGuest?: () => void
+  onBack?: () => void
+}) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,15 +39,15 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
     setLoading(true)
 
     if (mode === 'signin') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) setError(friendlyAuthError(signInError.message))
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: getAuthRedirectUrl() },
       })
-      if (error) setError(error.message)
+      if (signUpError) setError(friendlyAuthError(signUpError.message))
       else setSuccess('Revisa tu correo para confirmar tu cuenta.')
     }
 
@@ -42,6 +57,16 @@ export default function LoginPage({ onGuest }: { onGuest?: () => void }) {
   return (
     <div className="login-shell min-h-screen w-full flex items-center justify-center px-4 py-10 overflow-y-auto">
       <div className="w-full max-w-[420px]">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-4 text-sm text-[#666] hover:text-[#111111] flex items-center gap-1"
+          >
+            ← Volver a consulta express
+          </button>
+        )}
+
         <div className="login-card rounded-2xl border border-[#e5e5e5] bg-white/95 backdrop-blur-sm shadow-xl shadow-black/[0.06] px-6 py-8 sm:px-8 sm:py-9">
           <BrandHeader />
 

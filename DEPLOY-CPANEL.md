@@ -10,12 +10,12 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 
 | Entorno | Versión | Cómo verificar |
 |---------|---------|----------------|
-| GitHub `main` | **V1.5.0** (`b6e3e91+`) | Repo actualizado |
+| GitHub `main` | **V1.5.0** | Repo actualizado |
 | Build local | **V1.5.0** | `deploy-cpanel-ai.zip` en raíz |
-| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ **Anterior** | DevTools → `index-BZu9LrRK.js` = desactualizado |
-| Tras deploy | **V1.5.0** | DevTools → `index-B7yE_QLu.js` (o hash nuevo) |
+| Asset JS actual | **V1.5.0** | DevTools → `index-CFSiB-ZW.js` |
+| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Verificar | Si el JS ≠ `index-CFSiB-ZW.js`, redeploy cPanel |
 
-**Acción requerida:** subir el ZIP nuevo a cPanel y ejecutar `npm run deploy:chat` en Supabase.
+**Acción requerida:** subir **`deploy-cpanel-ai.zip`** a cPanel y ejecutar `npm run deploy:chat` en Supabase (modo express con 3 turnos requiere backend actualizado).
 
 ---
 
@@ -27,7 +27,9 @@ Guía paso a paso para publicar **AI-DA V1.5.0** en tu hosting cPanel.
 | 2 | Build del frontend + ZIP | Tu PC |
 | 3 | Subir y extraer ZIP | cPanel `public_html/ai/` |
 
-**Archivo listo para subir:** `deploy-cpanel-ai.zip` (raíz del proyecto)
+**Archivo listo para subir:** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) (raíz del proyecto — regenerar con `npm run deploy:cpanel`)
+
+**Build actual (2026-06-25):** `assets/index-CFSiB-ZW.js` · `assets/index-QLSpvJ6n.css`
 
 ---
 
@@ -118,11 +120,14 @@ Contenido del ZIP:
 
 1. Abre **https://allinremodeling.us/ai/**
 2. **Ctrl + Shift + R** (recarga forzada)
-3. Clic en **Consulta express sin cuenta**
-4. Escribe una pregunta (o sube foto de cocina)
-5. DevTools (F12) → Network:
+3. Confirma en DevTools → Sources que cargue **`index-CFSiB-ZW.js`**
+4. La primera pantalla es **modo express** (sin login): contador **0/3** en el header
+5. Escribe una pregunta (o sube foto de cocina) → recibes 5 tarjetas
+6. Envía un **segundo mensaje** refinando (ej. “prefiero vetas grises”) → GPT debe ajustar con contexto del turno anterior
+7. DevTools (F12) → Network:
    - `POST .../functions/v1/chat` → **200**
-   - Respuesta con `blocks[]` (5 tarjetas: análisis, inspiración, recomendación, SmartSlab, plan de acción)
+   - Body incluye `history[]` y `guestTurn` en turnos 2 y 3
+   - Respuesta con `blocks[]` y `followUp` indicando consultas restantes
 
 ---
 
@@ -182,8 +187,10 @@ npm run deploy:cpanel
 
 ## v1.5.0 — Qué incluye esta versión
 
-- **5 tarjetas dinámicas:** análisis → inspiración → recomendación → SmartSlab → plan con asesor
+- **Consulta express por defecto** — sin login; **3 turnos** con historial para refinar diseño (materiales, estilo, medidas)
+- **5 tarjetas dinámicas:** análisis → inspiración → recomendación → SmartSlab (1 full slab) → plan con asesor
 - **OpenAI Vision** para fotos (sin Claude)
 - **Multilingüe** — responde en el idioma del usuario
-- **SmartSlab** filtrado por medidas del proyecto
-- UI login mejorada + grid 2×2 en respuestas del chat
+- **SmartSlab** feed desde `/browse` + filtro por medidas del proyecto
+- Logo All In en header · CTAs WhatsApp, teléfono y Google Calendar en plan de acción
+- UI login opcional (“Iniciar sesión”) para historial y asesor completo

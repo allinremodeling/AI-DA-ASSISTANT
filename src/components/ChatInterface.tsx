@@ -16,14 +16,14 @@ import {
 } from 'lucide-react'
 import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/utils'
-import { sendChatMessage, getGuestMessageLimit } from '../lib/chatService'
+import { sendChatMessage, getGuestMessageLimit, buildConversationHistory } from '../lib/chatService'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
-import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
+import { BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { BrandMark } from './BrandMark'
 
 const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
-const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\n1 consulta gratuita con análisis visual y plan de acción All In. Sin guardar historial.`
+const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\nTienes **3 consultas gratuitas** para describir tu proyecto, subir una foto y afinar el diseño (materiales, estilo, medidas). Al final verás un plan de acción con All In.`
 
 export function ChatInterface({
   mode = 'authenticated',
@@ -136,11 +136,12 @@ export function ChatInterface({
   const handleSend = async () => {
     if (!input.trim() && !imagePreview) return
 
+    const imageToSend = imagePreview || undefined
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
-      content: input.trim() || (imagePreview ? 'Analiza esta imagen de mi cocina' : ''),
-      imageUrl: imagePreview || undefined,
+      content: input.trim() || (imageToSend ? 'Analiza esta imagen de mi cocina' : ''),
+      imageUrl: imageToSend,
     }
 
     const updated = [...messages, userMessage]
@@ -151,13 +152,14 @@ export function ChatInterface({
     setLoadingText('🔎 Analizando tu proyecto...')
 
     const userLang = navigator.language.slice(0, 2).toLowerCase()
+    const history = isGuest ? buildConversationHistory(messages) : undefined
 
     const response = await sendChatMessage(
       threadId,
       userMessage.content,
-      imagePreview || undefined,
+      imageToSend,
       (status) => setLoadingText(status),
-      { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang },
+      { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang, history },
     )
 
     const final = [...updated, response]
@@ -380,20 +382,43 @@ export function ChatInterface({
 
         {/* Top bar */}
         <div className="h-auto min-h-12 flex items-center justify-between px-3 sm:px-4 py-2 border-b border-[#e5e5e5] shrink-0 gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-1.5 hover:bg-[#f5f5f5] rounded-lg transition-colors lg:hidden shrink-0"
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {!isGuest && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-1.5 hover:bg-[#f5f5f5] rounded-lg transition-colors lg:hidden shrink-0"
+              >
+                <Menu className="w-5 h-5 text-[#6b6b6b]" />
+              </button>
+            )}
+            <a
+              href={ECOSYSTEM.remodeling.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center shrink-0 hover:opacity-90 transition-opacity"
+              title="All In Remodeling"
             >
-              <Menu className="w-5 h-5 text-[#6b6b6b]" />
-            </button>
-            <h2 className="text-xs sm:text-sm font-medium text-[#6b6b6b] truncate">
-              {isGuest ? `Express · ${BRAND.productName}` : BRAND.productName}
-            </h2>
+              <img
+                src={BRAND_ASSETS.logoAllIn}
+                alt="All In Remodeling"
+                className="h-7 sm:h-8 w-auto max-w-[130px] object-contain"
+              />
+            </a>
             {isGuest && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0 whitespace-nowrap">
-                {guestUserMessages}/{guestLimit}
-              </span>
+              <>
+                <span className="text-[#ddd] hidden sm:inline">|</span>
+                <span className="text-xs sm:text-sm font-medium text-[#6b6b6b] truncate hidden sm:inline">
+                  Express · {BRAND.productName}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0 whitespace-nowrap">
+                  {guestUserMessages}/{guestLimit}
+                </span>
+              </>
+            )}
+            {!isGuest && (
+              <h2 className="text-xs sm:text-sm font-medium text-[#6b6b6b] truncate">
+                {BRAND.productName}
+              </h2>
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -556,7 +581,15 @@ export function ChatInterface({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe tu cocina, sube una foto, o pregunta sobre productos..."
+                placeholder={
+                  isGuest
+                    ? guestUserMessages >= guestLimit
+                      ? 'Consultas express agotadas — inicia sesión para continuar'
+                      : guestUserMessages === 0
+                        ? 'Describe tu cocina o sube una foto para empezar...'
+                        : `Ajusta materiales, estilo o medidas (${guestLimit - guestUserMessages} consulta${guestLimit - guestUserMessages === 1 ? '' : 's'} restante${guestLimit - guestUserMessages === 1 ? '' : 's'})...`
+                    : 'Describe tu cocina, sube una foto, o pregunta sobre productos...'
+                }
                 className="w-full px-4 py-3 bg-transparent text-sm text-[#111111] placeholder-[#999999] resize-none focus:outline-none min-h-[48px] max-h-[200px]"
                 rows={1}
                 disabled={isLoading || (isGuest && guestUserMessages >= guestLimit)}
@@ -599,7 +632,9 @@ export function ChatInterface({
             </div>
             <p className="text-xs text-[#999999] text-center mt-2">
               {isGuest
-                ? 'Modo invitado: tu consulta no se guarda. Crea cuenta para continuar.'
+                ? guestUserMessages >= guestLimit
+                  ? 'Has usado tus 3 consultas express. Inicia sesión para seguir afinando con un asesor All In.'
+                  : `Consulta express ${guestUserMessages + 1}/${guestLimit}: puedes refinar tu diseño antes de crear cuenta.`
                 : 'All In AI puede cometer errores. Verifica la informacion importante. Arrastra imagenes para subirlas.'}
             </p>
           </div>

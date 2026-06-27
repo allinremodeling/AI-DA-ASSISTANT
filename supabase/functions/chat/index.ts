@@ -6,6 +6,9 @@ import { matchEcosystemServices } from "../_shared/ecosystem.ts";
 import { searchSmartSlabListings } from "../_shared/smartslab.ts";
 import { parseProjectDimensions, formatDimensionsForContext } from "../_shared/dimensions.ts";
 import { orchestrateChatResponse } from "../_shared/orchestrator.ts";
+import { buildFullConversationContext, type ChatHistoryTurn } from "../_shared/history.ts";
+
+const GUEST_TURN_LIMIT = 3;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +21,8 @@ interface ChatRequest {
   imageBase64?: string;
   guest?: boolean;
   lang?: string;
+  history?: ChatHistoryTurn[];
+  guestTurn?: number;
 }
 
 async function searchProducts(
@@ -49,23 +54,29 @@ export default {
       const lang = (body.lang || 'es').slice(0, 2).toLowerCase();
       const searchDate = new Date().toISOString().slice(0, 10);
 
-      const dimensions = parseProjectDimensions(message);
+      const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
+      const guestTurn = guest ? Math.min(body.guestTurn ?? 1, GUEST_TURN_LIMIT) : undefined;
+      const fullContext = buildFullConversationContext(message, history);
+
+      const dimensions = parseProjectDimensions(fullContext);
       const dimensionsText = formatDimensionsForContext(dimensions);
 
       let visionAnalysis = "";
       if (body.imageBase64) {
-        visionAnalysis = await analyzeImageWithOpenAI(body.imageBase64, message, lang);
+        visionAnalysis = await analyzeImageWithOpenAI(body.imageBase64, fullContext.slice(0, 800), lang);
       }
 
-      const contextQuery = `${message} ${visionAnalysis}`.slice(0, 500);
+      const contextQuery = `${fullContext} ${visionAnalysis}`.slice(0, 800);
 
       const productQuery =
         message.match(/cuarzo|quartz|gabinete|cabinet|shaker|encimera|counter|calacatta|granite|granito|vanity|isla|island/i)?.[0]
         || message.slice(0, 40);
 
+      const inspirationQuery = `${contextQuery} ${productQuery} design inspiration trends`.slice(0, 500);
+
       const [analysisWeb, inspirationWeb, smartslabListings, products, portfolio] = await Promise.all([
         searchAnalysisContext(contextQuery, searchDate, lang),
-        searchInspirationReferences(contextQuery, lang),
+        searchInspirationReferences(inspirationQuery, lang),
         searchSmartSlabListings(contextQuery, 1, dimensions.requiredSqft),
         searchProducts(ctx.supabaseAdmin, productQuery),
         Promise.resolve(matchPortfolio(contextQuery, 1)),
@@ -77,6 +88,9 @@ export default {
       const { intro, blocks, followUp } = await orchestrateChatResponse({
         message,
         guest,
+        guestTurn,
+        guestTurnLimit: GUEST_TURN_LIMIT,
+        history,
         hasImage,
         lang,
         visionAnalysis,

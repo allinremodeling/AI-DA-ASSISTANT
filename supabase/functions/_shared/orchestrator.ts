@@ -2,6 +2,8 @@ import { buildActionPlanSteps } from './ecosystem.ts';
 import { noSlabAdvisorMessage, type SmartSlabRow } from './smartslab.ts';
 import type { TrendResult } from './trends.ts';
 import type { ProjectDimensions } from './dimensions.ts';
+import type { ChatHistoryTurn } from './history.ts';
+import { guestRefinementFollowUp, guestTurnsRemaining } from './history.ts';
 
 export interface DesignBlock {
   type: string;
@@ -18,6 +20,9 @@ export interface DesignBlock {
 export interface OrchestratorContext {
   message: string;
   guest: boolean;
+  guestTurn?: number;
+  guestTurnLimit?: number;
+  history: ChatHistoryTurn[];
   hasImage: boolean;
   lang: string;
   visionAnalysis: string;
@@ -134,6 +139,8 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
 
   const contextPayload = {
     userMessage: ctx.message,
+    conversationHistory: ctx.history,
+    guestTurn: ctx.guestTurn,
     lang: ctx.lang,
     hasImage: ctx.hasImage,
     visionAnalysis: ctx.visionAnalysis || null,
@@ -145,6 +152,9 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
     services: ctx.services,
     smartslabListings: ctx.smartslabListings,
     portfolio: ctx.portfolioItem,
+    expressTurnsRemaining: ctx.guest
+      ? guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3)
+      : null,
   };
 
   if (!apiKey || apiKey.includes('your-key')) {
@@ -155,7 +165,7 @@ export async function orchestrateChatResponse(ctx: OrchestratorContext): Promise
         : 'Your AI-DA consultation is ready. Review each section — the action plan at the end connects you with an All In advisor.',
       blocks,
       followUp: ctx.guest
-        ? (ctx.lang === 'es' ? 'Modo invitado: crea una cuenta gratuita para continuar con un asesor.' : 'Guest mode: create a free account to continue with an advisor.')
+        ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
         : (ctx.lang === 'es' ? '¿Listo para agendar una consulta virtual o recibir una cotización?' : 'Ready to schedule a virtual consultation or get a detailed quote?'),
     };
   }
@@ -181,14 +191,16 @@ CRITICAL RULES:
 1. Use context.lang — respond ENTIRELY in that language (intro, blocks, followUp). Never switch languages.
 2. Return JSON: {"intro":"...","blocks":[...],"followUp":"..."}
 3. Provide exactly 4 blocks with types in order: analysis, inspiration, recommendation, marketplace (action_plan is injected by us — omit it).
-4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Must feel personal — never generic.
+4. CARD 1 analysis: Start like "Ok, let me analyze your project..." (in user's language). Paraphrase what the user wants, validate intent, combine visionAnalysis + analysisWeb + dimensions. Wrap important keywords in **double asterisks** (materials, room type, style, colors, dimensions) so they render bold — e.g. **cuarzo Calacatta**, **cocina**, **isla**.
 5. CARD 2 inspiration: Short trend reference text from inspirationWeb. We inject imageUrl server-side from inspirationWeb — do NOT invent image URLs in JSON.
 6. CARD 3 recommendation: Recommend All In products/services from context (quartz, granite, marble, porcelain, cabinets, waterfall island, fabrication, installation). Only business-relevant offerings. Include imageUrl from products or portfolio when available.
 7. CARD 4 marketplace: Show exactly ONE full slab from smartslabListings (never remnants). Explain why it fits (material, sq ft, application). If smartslabListings is empty, tell the user in their language that no matching full slab was found and an All In advisor will guide them — point to the action plan below. Do not invent listings.
 8. Write like a professional design consultant — clear, natural, not robotic. No endless bullet lists.
 9. NEVER reuse the same phrases across different queries. Personalize from userMessage, vision, web data, products, slabs.
 10. intro: 1-2 sentences — user must feel you are actively researching (searchDate in context).
-11. followUp: one question toward speaking with an All In advisor.`,
+11. followUp: one short question. If guest express and expressTurnsRemaining > 0, invite the user to refine (materials, colors, layout, budget) and mention how many express turns remain. If expressTurnsRemaining is 0, invite creating a free AI-DA account. Otherwise, ask about scheduling with an All In advisor.
+12. When conversationHistory is non-empty, the latest userMessage is feedback or a refinement — acknowledge what changed vs prior turns and update all cards accordingly. Do not ignore previous context.
+13. For guest express mode turn 2+: explicitly compare the new request with prior turns so the conversation feels fluid and accurate for interior design.`,
           },
           {
             role: 'user',
@@ -212,7 +224,7 @@ CRITICAL RULES:
       analysis: { es: 'Tu proyecto — lo que entendemos', en: 'Your project — what we understand' },
       inspiration: { es: 'Inspiración para tu espacio', en: 'Inspiration for your space' },
       recommendation: { es: 'Recomendación All In', en: 'All In recommendation' },
-      marketplace: { es: 'Smart Slab — inventario disponible', en: 'Smart Slab — available inventory' },
+      marketplace: { es: 'Smart Slab — full slab recomendado', en: 'Smart Slab — recommended full slab' },
     };
     const FALLBACK_TEXTS: Record<string, Record<string, string>> = {
       recommendation: { es: `Servicios disponibles: ${ctx.services.map((s) => s.name).join(', ')}.`, en: `Available services: ${ctx.services.map((s) => s.name).join(', ')}.` },
@@ -244,7 +256,7 @@ CRITICAL RULES:
       if (type === 'marketplace') {
         if (ctx.smartslabListings.length === 0) {
           enriched.text = noSlabAdvisorMessage(ctx.lang);
-        } else if (!enriched.text) {
+        } else {
           enriched.text = marketplaceBlockText(ctx);
         }
       }
@@ -265,7 +277,7 @@ CRITICAL RULES:
       intro: parsed.intro || (ctx.lang === 'es' ? 'Análisis completo — revisa cada sección.' : 'Analysis complete — review each section below.'),
       blocks,
       followUp: parsed.followUp || (ctx.guest
-        ? (ctx.lang === 'es' ? 'Crea una cuenta para continuar con un asesor All In.' : 'Create an account to continue with an All In advisor.')
+        ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
         : (ctx.lang === 'es' ? '¿Te gustaría agendar una consulta virtual gratuita?' : 'Would you like to schedule a free virtual consultation?')),
     };
   } catch (err) {
@@ -274,7 +286,9 @@ CRITICAL RULES:
     return {
       intro: ctx.lang === 'es' ? 'Tu consulta AI-DA está lista.' : 'Your AI-DA consultation is ready.',
       blocks,
-      followUp: ctx.lang === 'es' ? '¿Te gustaría que un asesor All In te contacte?' : 'Would you like an All In advisor to contact you?',
+      followUp: ctx.guest
+        ? guestRefinementFollowUp(ctx.lang, guestTurnsRemaining(ctx.guestTurn ?? 1, ctx.guestTurnLimit ?? 3))
+        : (ctx.lang === 'es' ? '¿Te gustaría que un asesor All In te contacte?' : 'Would you like an All In advisor to contact you?'),
     };
   }
 }

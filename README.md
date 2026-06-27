@@ -7,6 +7,23 @@ Integrado con **[SmartSlab](https://smartslab.app)** marketplace de slabs y rema
 **Live:** [ai-da-assistant.netlify.app](https://ai-da-assistant.netlify.app/)  
 **cPanel:** [allinremodeling.us/ai/](https://allinremodeling.us/ai/)
 
+**Deploy cPanel (archivo listo):** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) — generar con `npm run deploy:cpanel`. Guía completa: [`DEPLOY-CPANEL.md`](DEPLOY-CPANEL.md).
+
+---
+
+## Modo express (invitado)
+
+La landing por defecto es **consulta express** — no requiere cuenta.
+
+| Característica | Detalle |
+|----------------|---------|
+| Turnos | **3 consultas** por sesión (primera + 2 refinamientos) |
+| Contexto | Cada mensaje envía `history[]` al Edge Function; GPT ajusta las 5 tarjetas según feedback |
+| Límite agotado | Invita a **Iniciar sesión** para continuar con asesor All In |
+| Persistencia | No guarda historial en localStorage (solo sesión en memoria) |
+
+Flujo típico: describe cocina → recibe análisis → “cambia a granito negro” → “agranda la isla” → crear cuenta para seguir.
+
 ---
 
 ## Ecosistema
@@ -45,15 +62,9 @@ AI-DA detecta automáticamente el idioma del usuario y responde íntegramente en
 - El modelo (GPT-4o-mini como orquestador) recibe `lang` explícito en el contexto y responde en ese idioma
 - **No** se hardcodea español — cada bloque de cada card se genera en el idioma del usuario
 
-## Vision Fallback
+## Análisis de imagen
 
-El análisis de imágenes sigue una cadena de fallback:
-
-1. **Claude Vision** (`claude-sonnet-4-*`) — si `ANTHROPIC_API_KEY` está configurado
-2. **GPT-4o vision** (`gpt-4o-mini`) — fallback automático usando el mismo `OPENAI_API_KEY`
-3. **Sin análisis** — si ambas keys están ausentes, la Card 1 usa solo el texto del usuario
-
-Esto garantiza que la experiencia no se interrumpa aunque Claude Vision no esté disponible.
+V1.5.0 usa **OpenAI Vision** (`gpt-4o-mini`) con `OPENAI_API_KEY`. Si la key no está configurada en Supabase, la Card 1 usa solo el texto del usuario (modo demo local en el frontend).
 
 ---
 
@@ -77,17 +88,18 @@ El frontend **no** lleva API keys de OpenAI/Anthropic — solo `VITE_SUPABASE_UR
 |----------|-------------|
 | `VITE_SUPABASE_URL` | URL del proyecto Supabase |
 | `VITE_SUPABASE_ANON_KEY` | Anon key (auth + llamada a Edge Functions) |
+| `VITE_AUTH_REDIRECT_URL` | Redirect post-login (prod: `https://allinremodeling.us/ai/`) |
 | `VITE_CHAT_API_URL` | Opcional — override de la URL del chat |
 
 ### Supabase secrets (`supabase secrets set ...`)
 
 | Secret | Descripción |
 |--------|-------------|
-| `ANTHROPIC_API_KEY` | Claude Vision — análisis de fotos |
-| `OPENAI_API_KEY` | Copy y personalización de textos |
-| `TAVILY_API_KEY` | Búsqueda web de tendencias (opcional) |
+| `OPENAI_API_KEY` | **Obligatorio** — visión + orquestador GPT |
+| `TAVILY_API_KEY` | Búsqueda web de tendencias (recomendado) |
+| `SMARTSLAB_BROWSE_URL` | Opcional — override feed browse (default: smart-slab-app.vercel.app/browse) |
 | `SMARTSLAB_SUPABASE_URL` / `SMARTSLAB_SUPABASE_SECRET_KEY` | Listings SmartSlab (opcional) |
-| `SMARTSLAB_API_URL` | API alternativa (default: smart-slab-app.vercel.app) |
+| `SMARTSLAB_API_URL` | API alternativa JSON (opcional) |
 
 Los productos WooCommerce usan la conexión admin del mismo proyecto Supabase (`products`).
 
@@ -95,40 +107,31 @@ Los productos WooCommerce usan la conexión admin del mismo proyecto Supabase (`
 
 ## Deploy cPanel + Supabase
 
-### 1. Secrets y Edge Function
+Guía paso a paso: **[`DEPLOY-CPANEL.md`](DEPLOY-CPANEL.md)**
 
-```bash
-supabase login
-supabase link --project-ref TU_PROJECT_REF
-
-supabase secrets set \
-  ANTHROPIC_API_KEY=sk-ant-... \
-  OPENAI_API_KEY=sk-... \
-  TAVILY_API_KEY=tvly-...
-
-supabase functions deploy chat
-```
-
-La función queda en: `https://TU_PROJECT.supabase.co/functions/v1/chat`  
-(`verify_jwt = false` — acceso invitado + usuarios con anon key.)
-
-### 2. Build frontend para `/ai/`
+### Resumen rápido
 
 ```powershell
-# .env.local
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+cd f:\Proyectos\AI-DA-ASSISTANT
 
-npm install
-npm run build:cpanel
+# 1. Backend (Supabase Edge Function chat + secrets)
+npx supabase login
+npx supabase link --project-ref nchzvkvinhpnowopqbfb
+npx supabase secrets set OPENAI_API_KEY=sk-... TAVILY_API_KEY=tvly-...
+npm run deploy:chat
+
+# 2. Frontend — genera deploy-cpanel-ai.zip
+npm run deploy:cpanel
 ```
 
-Sube **todo el contenido** de `dist/` a `public_html/ai/` (incluye `.htaccess` para SPA).
+Sube **`deploy-cpanel-ai.zip`** a cPanel → `public_html/ai/` → Extract.  
+Build actual: `assets/index-CFSiB-ZW.js`.
 
-### 3. Verificar
+### Verificar
 
-- `https://allinremodeling.us/ai/` carga la app
-- En DevTools → Network, `POST .../functions/v1/chat` responde 200 con JSON `blocks[]`
+- `https://allinremodeling.us/ai/` abre en modo express (contador 0/3)
+- DevTools → Network: `POST .../functions/v1/chat` → 200, `blocks[]`, `followUp`
+- Turno 2+: el request incluye `history` y `guestTurn`
 
 ---
 
@@ -139,6 +142,8 @@ npm install
 npm run dev
 npm run build            # Netlify legacy (base /)
 npm run build:cpanel     # cPanel allinremodeling.us/ai/
+npm run deploy:cpanel    # build:cpanel + deploy-cpanel-ai.zip
+npm run deploy:chat      # supabase functions deploy chat
 npx netlify dev          # Solo si usas Netlify functions en local
 ```
 
@@ -150,13 +155,13 @@ npx netlify dev          # Solo si usas Netlify functions en local
 
 Merge del **Prompt Maestro AI-DA** — rediseño completo del flujo de respuesta:
 
-- **5 Cards**: estructura migrada de 4 pilares a 5 tarjetas explícitas (Analysis, Inspiration, AI-DA Recommendation, Smart Slab Marketplace, Action Plan)
-- **Detección de idioma**: `navigator.language` desde el frontend → `lang` propagado a todos los módulos del Edge Function → respuesta íntegra en el idioma del usuario
-- **Vision fallback**: Claude Vision → GPT-4o vision → vacío; nunca interrumpe el flujo por falta de API key
-- **SmartSlab como Card 4 dedicada**: el marketplace pasa de ser un listado flotante a una tarjeta estructurada dentro del flujo de 5 cards
-- **Thinking state**: mensaje de carga actualizado a `"🔎 Analizando tu proyecto..."` antes de mostrar resultados
-- **Tone personalizado**: el orquestador GPT-4o recibe `lang` explícito para evitar respuestas genéricas y variar por proyecto
-- **Documentación**: [`docs/V1-5-0.md`](docs/V1-5-0.md) — release notes, limitaciones y checklist de deploy
+- **Consulta express (3 turnos)**: landing sin login; historial conversacional para refinar diseño antes de crear cuenta
+- **5 Cards**: Analysis, Inspiration, AI-DA Recommendation, Smart Slab (1 full slab), Action Plan con CTAs All In
+- **Detección de idioma**: `navigator.language` → `lang` en todo el pipeline Edge Function
+- **OpenAI Vision** (`gpt-4o-mini`) para análisis de fotos
+- **SmartSlab feed** desde `/browse` + scoring por keywords y medidas del proyecto
+- **Deploy cPanel**: `npm run deploy:cpanel` → `deploy-cpanel-ai.zip` (ver [`DEPLOY-CPANEL.md`](DEPLOY-CPANEL.md))
+- **Documentación**: [`docs/V1-5-0.md`](docs/V1-5-0.md)
 
 ### v1.4.0 — 2026-06-25
 

@@ -4,9 +4,6 @@ import { supabase } from './lib/supabase'
 import { getAuthRedirectUrl } from './lib/authRedirect'
 import { ChatInterface } from './components/ChatInterface'
 import LoginPage from './components/LoginPage'
-import { cn } from './lib/utils'
-
-const GUEST_KEY = 'allin_ai_guest_mode'
 
 const supabaseConfigured =
   Boolean(import.meta.env.VITE_SUPABASE_URL) &&
@@ -14,14 +11,11 @@ const supabaseConfigured =
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [guestMode, setGuestMode] = useState(() => sessionStorage.getItem(GUEST_KEY) === '1')
+  const [loading, setLoading] = useState(supabaseConfigured)
+  const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
-    if (!supabaseConfigured) {
-      setLoading(false)
-      return
-    }
+    if (!supabaseConfigured) return
 
     const initAuth = async () => {
       const params = new URLSearchParams(window.location.search)
@@ -34,10 +28,7 @@ export default function App() {
 
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
-      if (session) {
-        sessionStorage.removeItem(GUEST_KEY)
-        setGuestMode(false)
-      }
+      if (session) setShowLogin(false)
       setLoading(false)
     }
 
@@ -45,43 +36,11 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) {
-        sessionStorage.removeItem(GUEST_KEY)
-        setGuestMode(false)
-      }
+      if (session) setShowLogin(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const startGuestMode = () => {
-    sessionStorage.setItem(GUEST_KEY, '1')
-    setGuestMode(true)
-  }
-
-  const exitGuestMode = () => {
-    sessionStorage.removeItem(GUEST_KEY)
-    setGuestMode(false)
-  }
-
-  if (!supabaseConfigured && !guestMode) {
-    return (
-      <div className="h-screen w-screen bg-white flex items-center justify-center p-6">
-        <div className="max-w-md text-center space-y-4">
-          <h1 className="text-xl font-semibold text-[#111111]">All In AI</h1>
-          <p className="text-sm text-neutral-600">
-            Supabase no está configurado. Puedes probar una consulta express como invitado.
-          </p>
-          <button
-            onClick={startGuestMode}
-            className="px-4 py-2 rounded-xl bg-[#111111] text-white text-sm hover:bg-[#333333]"
-          >
-            Consulta express
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (
@@ -91,18 +50,31 @@ export default function App() {
     )
   }
 
-  return (
-    <div className={cn(
-      'min-h-screen w-screen bg-white text-[#111111]',
-      session || guestMode ? 'h-screen overflow-hidden' : 'overflow-y-auto',
-    )}>
-      {session ? (
+  if (session) {
+    return (
+      <div className="h-screen w-screen bg-white text-[#111111] overflow-hidden">
         <ChatInterface mode="authenticated" onLogout={() => supabase.auth.signOut()} />
-      ) : guestMode ? (
-        <ChatInterface mode="guest" onSignIn={exitGuestMode} />
-      ) : (
-        <LoginPage onGuest={startGuestMode} />
-      )}
+      </div>
+    )
+  }
+
+  if (showLogin && supabaseConfigured) {
+    return (
+      <div className="min-h-screen w-screen bg-white text-[#111111] overflow-y-auto">
+        <LoginPage
+          onGuest={() => setShowLogin(false)}
+          onBack={() => setShowLogin(false)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-screen w-screen bg-white text-[#111111] overflow-hidden">
+      <ChatInterface
+        mode="guest"
+        onSignIn={supabaseConfigured ? () => setShowLogin(true) : undefined}
+      />
     </div>
   )
 }

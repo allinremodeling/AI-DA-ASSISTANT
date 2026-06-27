@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { Phone, Calendar, ExternalLink, Search } from 'lucide-react';
+import { Phone, Calendar, ExternalLink, Search, MessageCircle } from 'lucide-react';
 import type { DesignBlock, Product, SmartSlabListing } from '../lib/types';
 import { BLOCK_SECTION_LABELS } from '../lib/types';
 import { ADVISOR_CTA, BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand';
+import { RichText } from '../lib/richText';
 import { BrandMark, SmartSlabMark } from './BrandMark';
 
 const BLOCK_ORDER = [
@@ -65,7 +66,7 @@ export function AssistantMessageBody({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 lg:gap-7">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-8 md:gap-x-7 md:gap-y-9 items-start">
         {analysis && (
           <CardSection label={BLOCK_SECTION_LABELS.analysis} accent={BRAND_COLORS.accent}>
             <DesignBlockCard block={analysis} variant="analysis" />
@@ -130,16 +131,16 @@ function CardSection({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-3 min-w-0">
+    <div className="flex flex-col gap-4 min-w-0">
       {label && (
         <h3
-          className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug px-0.5"
+          className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-snug px-0.5 shrink-0"
           style={{ color: accent }}
         >
           {label}
         </h3>
       )}
-      {children}
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -170,7 +171,7 @@ function DesignBlockCard({
       }`}
     >
       {showImage && imageOnTop && (
-        <div className="aspect-[4/3] bg-[#f9f9f9] shrink-0 max-h-44 sm:max-h-48">
+        <div className="aspect-[4/3] bg-[#f9f9f9] shrink-0 w-full max-h-48 sm:max-h-52">
           <img
             src={block.imageUrl}
             alt={block.title}
@@ -184,7 +185,14 @@ function DesignBlockCard({
       )}
       <div className="p-3.5 sm:p-4 space-y-2 flex-1">
         <h4 className="text-sm font-semibold text-[#111111] leading-snug">{block.title}</h4>
-        <p className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed">{block.text}</p>
+        {variant === 'analysis' ? (
+          <RichText
+            text={block.text}
+            className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed"
+          />
+        ) : (
+          <p className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed">{block.text}</p>
+        )}
         {block.source && (
           <p className="text-[10px] text-[#999999] truncate">
             {isExternal ? `Referencia: ${block.source}` : `Fuente: ${block.source}`}
@@ -222,7 +230,7 @@ function IntegratedMarketplaceCard({
     <article className="bg-white border border-[#cceef5] rounded-xl overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col min-w-0">
       {imageUrl ? (
         <a href={slab!.url} target="_blank" rel="noopener noreferrer" className="block shrink-0">
-          <div className="aspect-[16/10] bg-[#f0fafb] max-h-44 sm:max-h-48 relative">
+          <div className="aspect-[16/10] bg-[#f0fafb] w-full max-h-52 sm:max-h-56 relative">
             <img
               src={imageUrl}
               alt={slab!.name}
@@ -281,12 +289,6 @@ function IntegratedMarketplaceCard({
 }
 
 function ActionPlanCard({ block }: { block: DesignBlock }) {
-  const ctaHref =
-    block.ctaType === 'call' ? ADVISOR_CTA.callPhone
-    : block.ctaType === 'smartslab' ? ADVISOR_CTA.smartslabBrowse
-    : block.ctaType === 'portfolio' ? BRAND.portfolio
-    : ADVISOR_CTA.freeEstimate;
-
   return (
     <article
       className="rounded-xl overflow-hidden border-2 w-full"
@@ -320,36 +322,34 @@ function ActionPlanCard({ block }: { block: DesignBlock }) {
             ))}
           </ol>
         )}
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
           <a
-            href={ADVISOR_CTA.freeEstimate}
+            href={ADVISOR_CTA.whatsAppQuote}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium text-white w-full sm:w-auto"
-            style={{ backgroundColor: BRAND_COLORS.accent }}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium text-white w-full"
+            style={{ backgroundColor: '#25D366' }}
           >
-            <Calendar className="w-3.5 h-3.5" />
-            Cotización gratis
+            <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+            Cotización gratis WhatsApp
           </a>
           <a
             href={ADVISOR_CTA.callPhone}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium border border-[#e5e5e5] bg-white text-[#111111] w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium border border-[#e5e5e5] bg-white text-[#111111] w-full"
           >
-            <Phone className="w-3.5 h-3.5" />
+            <Phone className="w-3.5 h-3.5 shrink-0" />
             {BRAND.phone}
           </a>
-          {block.ctaLabel && (
-            <a
-              href={ctaHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium text-white w-full sm:w-auto"
-              style={{ backgroundColor: BRAND_COLORS.primary }}
-            >
-              {block.ctaLabel}
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
+          <a
+            href={ADVISOR_CTA.scheduleVirtual}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium text-white w-full"
+            style={{ backgroundColor: BRAND_COLORS.accent }}
+          >
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            Agenda consulta gratuita
+          </a>
         </div>
         <p className="text-[10px] text-[#999] pt-1">
           {ECOSYSTEM.builders.name} · {ECOSYSTEM.remodeling.name} · {ECOSYSTEM.smartslab.name}

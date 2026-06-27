@@ -7,7 +7,23 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const CHAT_API =
   (import.meta.env.VITE_CHAT_API_URL as string | undefined)
   || (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/chat` : '/.netlify/functions/chat');
-const GUEST_MESSAGE_LIMIT = 1;
+const GUEST_MESSAGE_LIMIT = 3;
+
+export interface ChatHistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export function buildConversationHistory(messages: { id?: string; role: string; content: string; intro?: string }[]): ChatHistoryTurn[] {
+  return messages
+    .filter((m) => m.id !== 'welcome' && (m.role === 'user' || m.role === 'assistant'))
+    .map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: (m.role === 'assistant' ? (m.intro || m.content) : m.content).trim(),
+    }))
+    .filter((m) => m.content.length > 0)
+    .slice(-6);
+}
 
 export function getGuestMessageLimit(): number {
   return GUEST_MESSAGE_LIMIT;
@@ -39,19 +55,19 @@ export async function sendChatMessage(
   content: string,
   imageBase64?: string,
   onProgress?: (status: string) => void,
-  options?: { guest?: boolean; userMessageCount?: number; lang?: string },
+  options?: { guest?: boolean; userMessageCount?: number; lang?: string; history?: ChatHistoryTurn[] },
 ): Promise<ChatMessage> {
   if (options?.guest && (options.userMessageCount ?? 0) >= GUEST_MESSAGE_LIMIT) {
     return {
       id: `msg_${Date.now()}`,
       role: 'assistant',
-      intro: 'Has usado tu consulta express gratuita.',
-      content: 'Has usado tu consulta express gratuita.',
+      intro: 'Has usado tus 3 consultas express gratuitas.',
+      content: 'Has usado tus 3 consultas express gratuitas.',
       blocks: [
         {
           type: 'recommendation',
           title: 'Continúa con una cuenta',
-          text: 'Crea una cuenta gratis para guardar conversaciones, buscar productos en inventario y generar más diseños.',
+          text: 'Crea una cuenta gratis para seguir refinando tu diseño, guardar conversaciones y hablar con un asesor All In.',
           imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
           tags: ['cuenta gratis'],
         },
@@ -78,6 +94,8 @@ export async function sendChatMessage(
         imageBase64,
         guest: options?.guest ?? false,
         lang,
+        history: options?.history?.length ? options.history : undefined,
+        guestTurn: options?.guest ? (options.userMessageCount ?? 0) + 1 : undefined,
       }),
     });
 
@@ -161,6 +179,8 @@ function buildLocalMockResponse(content: string, hasImage: boolean, guest: boole
         url: ECOSYSTEM.smartslab.browse,
       },
     ],
-    followUp: guest ? 'Crea cuenta para continuar con un asesor.' : '¿Agendamos tu consulta virtual?',
+    followUp: guest
+      ? '¿Quieres ajustar materiales o estilo? Te quedan consultas express para refinar.'
+      : '¿Agendamos tu consulta virtual?',
   });
 }
