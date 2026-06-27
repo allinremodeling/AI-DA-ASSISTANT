@@ -55,10 +55,12 @@ function structuredToMessage(data: StructuredChatResponse): ChatMessage {
 export async function sendChatMessage(
   _threadId: string,
   content: string,
-  imageBase64?: string,
+  imageData?: string,
   onProgress?: (status: string) => void,
   options?: { guest?: boolean; userMessageCount?: number; lang?: string; history?: ChatHistoryTurn[] },
 ): Promise<ChatMessage> {
+  const isUrl = Boolean(imageData && (imageData.startsWith('http://') || imageData.startsWith('https://')));
+
   if (options?.guest && (options.userMessageCount ?? 0) >= GUEST_MESSAGE_LIMIT) {
     return {
       id: `msg_${Date.now()}`,
@@ -81,13 +83,13 @@ export async function sendChatMessage(
   onProgress?.('🔎 Ok, déjame analizar tu proyecto...');
 
   const lang = options?.lang || getUserLang();
-  const mayEdit = Boolean(imageBase64) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render/i.test(content);
+  const mayEdit = Boolean(imageData) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render/i.test(content);
 
   let editProgressTimer: ReturnType<typeof setTimeout> | undefined;
   if (mayEdit) {
     editProgressTimer = setTimeout(() => onProgress?.('🎨 Visualizando cambios en tu cocina...'), 5000);
     setTimeout(() => onProgress?.('✨ Afinando detalles del diseño...'), 14000);
-  } else if (imageBase64) {
+  } else if (imageData) {
     setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 3500);
   }
 
@@ -102,7 +104,7 @@ export async function sendChatMessage(
       },
       body: JSON.stringify({
         message: content,
-        imageBase64,
+        ...(imageData ? (isUrl ? { imageUrl: imageData } : { imageBase64: imageData }) : {}),
         guest: options?.guest ?? false,
         lang,
         history: options?.history?.length ? options.history : undefined,
@@ -123,7 +125,7 @@ export async function sendChatMessage(
 
   onProgress?.('Preparando respuesta...');
   await new Promise((r) => setTimeout(r, 1200));
-  return buildLocalMockResponse(content, Boolean(imageBase64), options?.guest ?? false);
+  return buildLocalMockResponse(content, Boolean(imageData), options?.guest ?? false);
 }
 
 function buildLocalMockResponse(content: string, hasImage: boolean, guest: boolean): ChatMessage {

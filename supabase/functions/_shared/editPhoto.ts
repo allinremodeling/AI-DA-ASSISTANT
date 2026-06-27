@@ -36,7 +36,8 @@ export function buildInpaintPrompt(userMessage: string, visionAnalysis: string, 
 }
 
 export interface EditPhotoInput {
-  imageBase64: string;
+  /** Cloudinary URL (preferred) or base64 data URI */
+  imageInput: string;
   prompt: string;
 }
 
@@ -70,9 +71,10 @@ async function pollReplicatePrediction(id: string, token: string, maxMs = 90000)
 
 /** instruct-pix2pix — natural language kitchen edits, preserves layout (Replicate). */
 async function runInstructPix2Pix(input: EditPhotoInput, token: string): Promise<EditPhotoResult> {
-  const image = input.imageBase64.startsWith('data:')
-    ? input.imageBase64
-    : `data:image/jpeg;base64,${input.imageBase64}`;
+  const isUrl = input.imageInput.startsWith('http://') || input.imageInput.startsWith('https://');
+  const image = isUrl
+    ? input.imageInput
+    : (input.imageInput.startsWith('data:') ? input.imageInput : `data:image/jpeg;base64,${input.imageInput}`);
 
   const createRes = await fetch('https://api.replicate.com/v1/models/timbrooks/instruct-pix2pix/predictions', {
     method: 'POST',

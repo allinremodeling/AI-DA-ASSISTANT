@@ -6,9 +6,9 @@ function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | nu
   return { mediaType: match[1].toLowerCase(), data: match[2] };
 }
 
-/** Kitchen photo analysis via OpenAI Vision — AI-DA consultant tone. */
+/** Kitchen photo analysis via OpenAI Vision — AI-DA consultant tone. Accepts Cloudinary URL or base64. */
 export async function analyzeImageWithOpenAI(
-  imageBase64: string,
+  imageInput: string,
   userMessage: string,
   lang = 'es',
 ): Promise<string> {
@@ -18,8 +18,16 @@ export async function analyzeImageWithOpenAI(
 
   if (!apiKey || apiKey.includes('your-key')) return '';
 
-  const parsed = parseDataUrl(imageBase64);
-  if (!parsed) return '';
+  const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
+  let imageUrlParam: string;
+
+  if (isUrl) {
+    imageUrlParam = imageInput;
+  } else {
+    const parsed = parseDataUrl(imageInput);
+    if (!parsed) return '';
+    imageUrlParam = `data:${parsed.mediaType};base64,${parsed.data}`;
+  }
 
   const photoRules = `
 ${AIDA_PERSONALITY}
@@ -44,7 +52,7 @@ If under construction, say so and focus on finish selections. Be warm and detail
           content: [
             {
               type: 'image_url',
-              image_url: { url: `data:${parsed.mediaType};base64,${parsed.data}`, detail: 'high' },
+              image_url: { url: imageUrlParam, detail: isUrl ? 'auto' : 'high' },
             },
             {
               type: 'text',
@@ -68,6 +76,6 @@ If under construction, say so and focus on finish selections. Be warm and detail
   }
 }
 
-export async function analyzeImageWithClaude(imageBase64: string, userMessage: string, lang = 'es'): Promise<string> {
-  return analyzeImageWithOpenAI(imageBase64, userMessage, lang);
+export async function analyzeImageWithClaude(imageInput: string, userMessage: string, lang = 'es'): Promise<string> {
+  return analyzeImageWithOpenAI(imageInput, userMessage, lang);
 }

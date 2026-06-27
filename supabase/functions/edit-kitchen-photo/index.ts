@@ -29,20 +29,10 @@ export default {
 
     try {
       const body = (await req.json()) as EditRequest;
-      let imageBase64 = body.imageBase64 || "";
+      // Prefer URL (Cloudinary optimized); fall back to base64
+      const imageInput = body.imageUrl || body.imageBase64 || "";
 
-      if (!imageBase64 && body.imageUrl) {
-        const imgRes = await fetch(body.imageUrl);
-        if (imgRes.ok) {
-          const buf = await imgRes.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          let binary = "";
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          imageBase64 = `data:image/jpeg;base64,${btoa(binary)}`;
-        }
-      }
-
-      if (!imageBase64) {
+      if (!imageInput) {
         return new Response(JSON.stringify({ error: "imageBase64 or imageUrl required" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -53,7 +43,7 @@ export default {
       const prompt = body.prompt?.trim()
         || buildInpaintPrompt("kitchen remodel visualization", "", lang);
 
-      const result = await editKitchenPhoto({ imageBase64, prompt });
+      const result = await editKitchenPhoto({ imageInput, prompt });
 
       return new Response(
         JSON.stringify({

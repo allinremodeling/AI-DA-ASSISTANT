@@ -23,6 +23,7 @@ import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages,
 import { AssistantMessageBody } from './DesignBlocks'
 import { BRAND, BRAND_ASSETS, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { BrandMark } from './BrandMark'
+import { uploadToCloudinary, getOptimizedUrl, isCloudinaryConfigured } from '../lib/cloudinary'
 
 const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
 const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\nTienes **3 consultas gratuitas** para describir tu proyecto, subir una foto y afinar el diseño (materiales, estilo, medidas). Al final verás un plan de acción con All In.`
@@ -47,6 +48,8 @@ export function ChatInterface({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageCloudinaryUrl, setImageCloudinaryUrl] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -99,9 +102,23 @@ export function ChatInterface({
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
+    setImageCloudinaryUrl(null)
+    // Show local preview immediately
     const reader = new FileReader()
     reader.onload = () => setImagePreview(reader.result as string)
     reader.readAsDataURL(file)
+    // Upload to Cloudinary in background if configured
+    if (isCloudinaryConfigured()) {
+      setImageUploading(true)
+      uploadToCloudinary(file)
+        .then((result) => {
+          setImageCloudinaryUrl(getOptimizedUrl(result.public_id))
+        })
+        .catch(() => {
+          // Silently fall back to base64 if upload fails
+        })
+        .finally(() => setImageUploading(false))
+    }
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,18 +146,20 @@ export function ChatInterface({
   const handleSend = async () => {
     if (!input.trim() && !imagePreview) return
 
-    const imageToSend = imagePreview || undefined
+    // Prefer Cloudinary URL (optimized); fall back to base64 if upload isn't done yet
+    const imageToSend = imageCloudinaryUrl || imagePreview || undefined
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
       content: input.trim() || (imageToSend ? 'Analiza esta imagen de mi cocina' : ''),
-      imageUrl: imageToSend,
+      imageUrl: imagePreview || imageToSend,
     }
 
     const updated = [...messages, userMessage]
     setMessages(updated)
     setInput('')
     setImagePreview(null)
+    setImageCloudinaryUrl(null)
     setIsLoading(true)
     setLoadingText('🔎 Analizando tu proyecto...')
 
@@ -418,6 +437,8 @@ export function ChatInterface({
                 onClick={() => {
                   const welcome = makeWelcomeMessage(isGuest)
                   setMessages([welcome])
+                  setImagePreview(null)
+                  setImageCloudinaryUrl(null)
                   if (!isGuest) saveMessages(threadId, [welcome])
                 }}
                 className="p-2 hover:bg-[#f5f5f5] rounded-lg transition-colors text-[#6b6b6b] chat-touch-target"
@@ -555,8 +576,16 @@ export function ChatInterface({
                   alt="Preview"
                   className="h-20 rounded-lg border border-[#e5e5e5]"
                 />
+                {imageUploading && (
+                  <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  </div>
+                )}
+                {!imageUploading && imageCloudinaryUrl && (
+                  <div className="absolute bottom-1 right-1 bg-green-500 rounded-full w-3 h-3" title="Imagen optimizada" />
+                )}
                 <button
-                  onClick={() => setImagePreview(null)}
+                  onClick={() => { setImagePreview(null); setImageCloudinaryUrl(null) }}
                   className="absolute -top-2 -right-2 w-5 h-5 bg-[#111111] text-white rounded-full flex items-center justify-center text-xs"
                 >
                   <X className="w-3 h-3" />
