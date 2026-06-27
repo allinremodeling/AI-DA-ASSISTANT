@@ -17,13 +17,14 @@ import {
 } from 'lucide-react'
 import type { ChatMessage } from '../lib/types'
 import { cn } from '../lib/utils'
-import { sendChatMessage, getGuestMessageLimit, buildConversationHistory } from '../lib/chatService'
+import { fetchChatResponse, completePhotoEdit, getGuestMessageLimit, buildConversationHistory } from '../lib/chatService'
 import { getExpressCount, incrementExpressCount } from '../lib/expressStorage'
 import { createNewThread, getThreadId, setThreadId, getThreadList, saveMessages, saveThreadTitle, getMessages } from '../lib/thread'
 import { AssistantMessageBody } from './DesignBlocks'
 import { BRAND, BRAND_COLORS, ECOSYSTEM } from '../lib/brand'
 import { AllInRemodelingMark, BrandMark } from './BrandMark'
 import { uploadToCloudinary, getOptimizedUrl, isCloudinaryConfigured } from '../lib/cloudinary'
+import { compressImageFile, revokeObjectUrl, safeImageRef, blobToDataUrl } from '../lib/imageUtils'
 
 const WELCOME_AUTH = `Bienvenido a ${BRAND.productFullName}.\n\nRecibirás 4 secciones: análisis visual, inspiración externa, referencias del ecosistema All In + SmartSlab, y un plan de acción para hablar con un asesor.`
 const WELCOME_GUEST = `Consulta express · ${BRAND.productName}\n\nTienes **3 consultas gratuitas** para describir tu proyecto, subir una foto y afinar el diseño (materiales, estilo, medidas). Al final verás un plan de acción con All In.`
@@ -63,6 +64,7 @@ export function ChatInterface({
   const [imageCloudinaryUrl, setImageCloudinaryUrl] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isEditingPhoto, setIsEditingPhoto] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [threadList, setThreadList] = useState(getThreadList())
@@ -74,6 +76,8 @@ export function ChatInterface({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const cloudinaryUrlRef = useRef<string | null>(null)
   const uploadPromiseRef = useRef<Promise<string | null> | null>(null)
+  const compressedBlobRef = useRef<Blob | null>(null)
+  const previewObjectUrlRef = useRef<string | null>(null)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -114,16 +118,31 @@ export function ChatInterface({
     }
   }, [isGuest])
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return
     setImageCloudinaryUrl(null)
     cloudinaryUrlRef.current = null
-    const reader = new FileReader()
-    reader.onload = () => setImagePreview(reader.result as string)
-    reader.readAsDataURL(file)
+    compressedBlobRef.current = null
+    revokeObjectUrl(previewObjectUrlRef.current)
+    previewObjectUrlRef.current = null
+
+    try {
+      const { blob, previewUrl } = await compressImageFile(file)
+      compressedBlobRef.current = blob
+      previewObjectUrlRef.current = previewUrl
+      setImagePreview(previewUrl)
+    } catch {
+      const reader = new FileReader()
+      reader.onload = () => setImagePreview(reader.result as string)
+      reader.readAsDataURL(file)
+    }
+
     if (isCloudinaryConfigured()) {
       setImageUploading(true)
-      uploadPromiseRef.current = uploadToCloudinary(file)
+      const uploadFile = compressedBlobRef.current
+        ? new File([compressedBlobRef.current], 'kitchen.jpg', { type: 'image/jpeg' })
+        : file
+      uploadPromiseRef.current = uploadToCloudinary(uploadFile)
         .then((result) => {
           const url = getOptimizedUrl(result.public_id)
           cloudinaryUrlRef.current = url
@@ -174,12 +193,23 @@ export function ChatInterface({
       if (uploadedUrl) cloudinaryUrlRef.current = uploadedUrl
     }
 
-    const imageToSend = cloudinaryUrlRef.current || imageCloudinaryUrl || imagePreview || undefined
+    const cloudinaryUrl = cloudinaryUrlRef.current || imageCloudinaryUrl || undefined
+    const compressedBlob = compressedBlobRef.current
+    const previewBlobUrl = previewObjectUrlRef.current || undefined
+
+    let apiImageData: string | undefined = cloudinaryUrl
+    if (!apiImageData && compressedBlob) {
+      apiImageData = await blobToDataUrl(compressedBlob)
+    } else if (!apiImageData && previewBlobUrl && !previewBlobUrl.startsWith('blob:')) {
+      apiImageData = previewBlobUrl
+    }
+
+    const userDisplayImage = safeImageRef(cloudinaryUrl || previewBlobUrl)
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
-      content: input.trim() || (imageToSend ? 'Analiza esta imagen de mi cocina' : ''),
-      imageUrl: imagePreview || imageToSend,
+      content: input.trim() || (apiImageData ? 'Analiza esta imagen de mi cocina' : ''),
+      imageUrl: userDisplayImage,
     }
 
     const updated = [...messages, userMessage]
@@ -189,29 +219,61 @@ export function ChatInterface({
     setImageCloudinaryUrl(null)
     cloudinaryUrlRef.current = null
     uploadPromiseRef.current = null
+    revokeObjectUrl(previewObjectUrlRef.current)
+    previewObjectUrlRef.current = null
+    compressedBlobRef.current = null
 
     const userLang = navigator.language.slice(0, 2).toLowerCase()
     const history = isGuest ? buildConversationHistory(messages) : undefined
 
+    const persist = (list: ChatMessage[]) => {
+      if (!isGuest) saveMessages(threadId, slimMessagesForStorage(list))
+    }
+
     try {
-      const response = await sendChatMessage(
-        threadId,
+      const response = await fetchChatResponse(
         userMessage.content,
-        imageToSend,
+        apiImageData,
         (status) => setLoadingText(status),
         { guest: isGuest, userMessageCount: guestUserMessages, lang: userLang, history },
       )
 
-      const final = [...updated, response]
-      setMessages(final)
-      if (!isGuest) {
-        saveMessages(threadId, slimMessagesForStorage(final))
+      let currentList = [...updated, response]
+      setMessages(currentList)
+      setIsLoading(false)
+
+      if (response.editPhotoPending && response.editPhotoPrompt && apiImageData) {
+        setIsEditingPhoto(true)
+        setLoadingText('🎨 Generando visualización…')
+        try {
+          const patch = await completePhotoEdit(
+            response,
+            apiImageData,
+            userLang,
+            (status) => setLoadingText(status),
+            { guest: isGuest, userMessageCount: guestUserMessages },
+          )
+          currentList = currentList.map((m) => (m.id === response.id ? { ...m, ...patch } : m))
+          setMessages(currentList)
+        } catch {
+          currentList = currentList.map((m) => (
+            m.id === response.id
+              ? { ...m, editPhotoPending: false, followUp: 'No pude generar la visualización. Intenta de nuevo o llámanos al 470-733-0461.' }
+              : m
+          ))
+          setMessages(currentList)
+        } finally {
+          setIsEditingPhoto(false)
+        }
       }
+
+      persist(currentList)
+
       if (isGuest) {
         setGuestUserMessages(incrementExpressCount())
       }
 
-      if (!isGuest && final.length <= 3 && threadId) {
+      if (!isGuest && currentList.length <= 3 && threadId) {
         const title = userMessage.content.slice(0, 40) + (userMessage.content.length > 40 ? '...' : '')
         saveThreadTitle(threadId, title)
         setThreadList(getThreadList())
@@ -225,6 +287,7 @@ export function ChatInterface({
       }])
     } finally {
       setIsLoading(false)
+      setIsEditingPhoto(false)
     }
   }
 
@@ -580,7 +643,7 @@ export function ChatInterface({
                 </div>
               ))}
 
-              {isLoading && (
+              {(isLoading || isEditingPhoto) && (
                 <div className="flex gap-2 sm:gap-3">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#111111] rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
                     <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />

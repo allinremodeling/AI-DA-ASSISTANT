@@ -1,6 +1,8 @@
 import type { ChatMessage, StructuredChatResponse } from './types';
 import { matchPortfolio, ALLIN_PORTFOLIO } from './portfolio';
 import { ECOSYSTEM } from './brand';
+import { ensureCloudinaryUrl, isCloudinaryConfigured } from './cloudinary';
+import { isHttpUrl, safeImageRef } from './imageUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -37,20 +39,17 @@ export function getUserLang(): string {
   return (navigator.language || 'es').slice(0, 2).toLowerCase();
 }
 
-function isPublicUrl(value?: string): boolean {
-  return Boolean(value && (value.startsWith('http://') || value.startsWith('https://')));
-}
-
-function sanitizeOriginalImage(value?: string): string | undefined {
-  if (!value || !isPublicUrl(value)) return undefined;
-  return value;
+function authHeaders(): Record<string, string> {
+  return SUPABASE_ANON_KEY
+    ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
+    : {};
 }
 
 function structuredToMessage(data: StructuredChatResponse, userImageUrl?: string): ChatMessage {
   const summary = data.intro || 'Consulta AI-DA completada';
 
   return {
-    id: `msg_${Date.now()}`,
+    id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     role: 'assistant',
     content: summary,
     intro: data.intro,
@@ -58,46 +57,12 @@ function structuredToMessage(data: StructuredChatResponse, userImageUrl?: string
     followUp: data.followUp,
     products: data.products?.length ? data.products : undefined,
     smartslabListings: data.smartslabListings?.length ? data.smartslabListings : undefined,
-    generatedImage: data.generatedImage,
-    originalImage: sanitizeOriginalImage(data.originalImage) || sanitizeOriginalImage(userImageUrl),
+    generatedImage: safeImageRef(data.generatedImage),
+    originalImage: safeImageRef(data.originalImage) || safeImageRef(userImageUrl),
     editPhotoApplied: data.editPhotoApplied,
-    editPhotoPending: data.shouldEditPhoto && !data.generatedImage,
+    editPhotoPending: Boolean(data.shouldEditPhoto && !data.generatedImage),
+    editPhotoPrompt: data.editPhotoPrompt,
   };
-}
-
-async function runPhotoEdit(
-  imageData: string,
-  prompt: string,
-  lang: string,
-  onProgress?: (status: string) => void,
-): Promise<{ editedImageUrl?: string; error?: string }> {
-  onProgress?.('🎨 Generando visualización con IA...');
-
-  const isUrl = isPublicUrl(imageData);
-  const res = await fetch(EDIT_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(SUPABASE_ANON_KEY
-        ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
-        : {}),
-    },
-    body: JSON.stringify({
-      ...(isUrl ? { imageUrl: imageData } : { imageBase64: imageData }),
-      prompt,
-      lang,
-    }),
-  });
-
-  if (!res.ok) {
-    return { error: `edit_http_${res.status}` };
-  }
-
-  const data = await res.json() as { editedImageUrl?: string | null; error?: string };
-  if (data.editedImageUrl) {
-    return { editedImageUrl: data.editedImageUrl };
-  }
-  return { error: data.error || 'edit_failed' };
 }
 
 const EDIT_FAILURE_ES =
@@ -105,8 +70,8 @@ const EDIT_FAILURE_ES =
 const EDIT_FAILURE_EN =
   "I'm having trouble generating the visualization right now. Would you like to schedule a free consultation so our designer can show you options in person? Call us at **470-733-0461**.";
 
-export async function sendChatMessage(
-  _threadId: string,
+/** Step 1 — chat analysis only (fast). Photo edit runs separately via completePhotoEdit. */
+export async function fetchChatResponse(
   content: string,
   imageData?: string,
   onProgress?: (status: string) => void,
@@ -135,79 +100,106 @@ export async function sendChatMessage(
 
   onProgress?.('🔎 Ok, déjame analizar tu proyecto...');
 
-  const mayEdit = Boolean(imageData) && /cambiar|change|edit|modificar|gabinete|cabinet|encimera|counter|color|quartz|cuarzo|shaker|visualiz|render|ponle|pon|aplica|material|diseño|design/i.test(content);
+  const res = await fetch(CHAT_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({
+      message: content,
+      ...(imageData
+        ? (isHttpUrl(imageData) ? { imageUrl: imageData } : { imageBase64: imageData })
+        : {}),
+      guest: options?.guest ?? false,
+      lang,
+      history: options?.history?.length ? options.history : undefined,
+      guestTurn: options?.guest ? (options.userMessageCount ?? 0) + 1 : undefined,
+    }),
+  });
 
-  let editProgressTimer: ReturnType<typeof setTimeout> | undefined;
-  if (mayEdit) {
-    editProgressTimer = setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 4000);
-  } else if (imageData) {
-    setTimeout(() => onProgress?.('📸 Analizando tu foto con detalle...'), 3500);
-  }
-
-  try {
-    const res = await fetch(CHAT_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(SUPABASE_ANON_KEY
-          ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY }
-          : {}),
-      },
-      body: JSON.stringify({
-        message: content,
-        ...(imageData
-          ? (isPublicUrl(imageData) ? { imageUrl: imageData } : { imageBase64: imageData })
-          : {}),
-        guest: options?.guest ?? false,
-        lang,
-        history: options?.history?.length ? options.history : undefined,
-        guestTurn: options?.guest ? (options.userMessageCount ?? 0) + 1 : undefined,
-      }),
-    });
-
-    if (res.ok) {
-      onProgress?.('Buscando inspiración y materiales...');
-      const data = (await res.json()) as StructuredChatResponse;
-      if (editProgressTimer) clearTimeout(editProgressTimer);
-
-      let message = structuredToMessage(data, imageData);
-
-      if (data.shouldEditPhoto && data.editPhotoPrompt && imageData && !data.generatedImage) {
-        onProgress?.('🎨 Visualizando cambios en tu cocina...');
-        editProgressTimer = setTimeout(() => onProgress?.('✨ Afinando detalles del diseño...'), 12000);
-
-        const edit = await runPhotoEdit(imageData, data.editPhotoPrompt, lang, onProgress);
-        if (editProgressTimer) clearTimeout(editProgressTimer);
-
-        if (edit.editedImageUrl) {
-          message = {
-            ...message,
-            generatedImage: edit.editedImageUrl,
-            editPhotoApplied: true,
-            editPhotoPending: false,
-            originalImage: sanitizeOriginalImage(imageData),
-            followUp: options?.guest && (options.userMessageCount ?? 0) + 1 === 2
-              ? (lang === 'es'
-                ? '¿Te gusta cómo se ve? **Crea una cuenta gratis** para guardar este diseño y seguir probando opciones con nuestro diseñador.'
-                : 'Do you like how it looks? **Create a free account** to save this design and keep trying options with our designer.')
-              : message.followUp,
-          };
-        } else {
-          message = {
-            ...message,
-            editPhotoPending: false,
-            followUp: lang === 'es' ? EDIT_FAILURE_ES : EDIT_FAILURE_EN,
-          };
-        }
-      }
-
-      return message;
-    }
-
+  if (!res.ok) {
     const errBody = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(errBody.error || `HTTP ${res.status}`);
+  }
+
+  onProgress?.('Buscando inspiración y materiales...');
+  const data = (await res.json()) as StructuredChatResponse;
+  return structuredToMessage(data, imageData);
+}
+
+/** Step 2 — generate edited image (slow). Returns patch to merge into the assistant message. */
+export async function completePhotoEdit(
+  message: ChatMessage,
+  imageData: string,
+  lang: string,
+  onProgress?: (status: string) => void,
+  options?: { guest?: boolean; userMessageCount?: number },
+): Promise<Partial<ChatMessage>> {
+  const prompt = message.editPhotoPrompt;
+  if (!prompt || !imageData) {
+    return { editPhotoPending: false };
+  }
+
+  onProgress?.('🎨 Visualizando cambios en tu cocina...');
+
+  const res = await fetch(EDIT_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({
+      ...(isHttpUrl(imageData) ? { imageUrl: imageData } : { imageBase64: imageData }),
+      prompt,
+      lang,
+    }),
+  });
+
+  if (!res.ok) {
+    return { editPhotoPending: false, followUp: lang === 'es' ? EDIT_FAILURE_ES : EDIT_FAILURE_EN };
+  }
+
+  onProgress?.('✨ Optimizando imagen...');
+  const data = await res.json() as { editedImageUrl?: string | null; error?: string };
+  let editedUrl = safeImageRef(data.editedImageUrl ?? undefined);
+
+  if (editedUrl && isCloudinaryConfigured()) {
+    editedUrl = await ensureCloudinaryUrl(editedUrl) || editedUrl;
+  }
+
+  if (editedUrl) {
+    return {
+      generatedImage: editedUrl,
+      originalImage: safeImageRef(imageData),
+      editPhotoApplied: true,
+      editPhotoPending: false,
+      followUp: options?.guest && (options.userMessageCount ?? 0) + 1 === 2
+        ? (lang === 'es'
+          ? '¿Te gusta cómo se ve? **Crea una cuenta gratis** para guardar este diseño y seguir probando opciones con nuestro diseñador.'
+          : 'Do you like how it looks? **Create a free account** to save this design and keep trying options with our designer.')
+        : message.followUp,
+    };
+  }
+
+  return {
+    editPhotoPending: false,
+    followUp: lang === 'es' ? EDIT_FAILURE_ES : EDIT_FAILURE_EN,
+  };
+}
+
+/** Backward-compatible single call — prefer progressive flow in ChatInterface. */
+export async function sendChatMessage(
+  _threadId: string,
+  content: string,
+  imageData?: string,
+  onProgress?: (status: string) => void,
+  options?: { guest?: boolean; userMessageCount?: number; lang?: string; history?: ChatHistoryTurn[] },
+): Promise<ChatMessage> {
+  const lang = options?.lang || getUserLang();
+
+  try {
+    const message = await fetchChatResponse(content, imageData, onProgress, options);
+    if (message.editPhotoPending && imageData && message.editPhotoPrompt) {
+      const patch = await completePhotoEdit(message, imageData, lang, onProgress, options);
+      return { ...message, ...patch };
+    }
+    return message;
   } catch (err) {
-    if (editProgressTimer) clearTimeout(editProgressTimer);
     if (SUPABASE_URL && CHAT_API.includes('supabase')) {
       return {
         id: `msg_${Date.now()}`,
@@ -221,7 +213,6 @@ export async function sendChatMessage(
           : 'If this persists, call us at **470-733-0461**.',
       };
     }
-    // fall through to local mock only when no Supabase configured
   }
 
   onProgress?.('Preparando respuesta...');

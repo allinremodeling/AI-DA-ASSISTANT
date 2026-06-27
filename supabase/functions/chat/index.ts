@@ -137,7 +137,7 @@ export default {
       // Photo edit runs in a second request (edit-kitchen-photo) to avoid timeouts
       // and oversized JSON responses that crash the browser with base64 echoes.
 
-      if (guest && guestTurn === GUEST_TURN_LIMIT && !editFailed) {
+      if (guest && guestTurn === GUEST_TURN_LIMIT) {
         finalFollowUp = guestRefinementFollowUp(lang, 0);
       }
 

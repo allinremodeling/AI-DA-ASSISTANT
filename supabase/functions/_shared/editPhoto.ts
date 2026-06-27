@@ -1,5 +1,7 @@
 /** Detect edit intent + Replicate / Stability photo editing for edit_photo tool. */
 
+import { finalizePublicImageUrl } from './cloudinary.ts';
+
 const EDIT_VERBS =
   /cambiar|change|edit|modificar|haz(me)?|hacer|make|poner|put|ponle|pon|quiero|want|prefiero|prefer|muestra|show|visualiz|render|prueba|try|actualiza|update|aplica|apply|simula|simulate|diseña|design|coloca|agrega|add/i;
 const EDIT_TARGETS =
@@ -174,29 +176,46 @@ export async function editKitchenPhoto(input: EditPhotoInput): Promise<EditPhoto
   const replicateToken = Deno.env.get('REPLICATE_API_TOKEN');
   const stabilityKey = Deno.env.get('STABILITY_API_KEY');
 
+  let rawUrl: string | null = null;
+  let provider: EditPhotoResult['provider'];
+
   if (replicateToken && !replicateToken.includes('your')) {
     try {
       const replicateResult = await runInstructPix2Pix(input, replicateToken);
-      if (replicateResult.editedImageUrl) return replicateResult;
+      if (replicateResult.editedImageUrl) {
+        rawUrl = replicateResult.editedImageUrl;
+        provider = 'replicate';
+      }
     } catch (err) {
       console.error('editKitchenPhoto replicate error', err);
     }
   }
 
-  if (stabilityKey && !stabilityKey.includes('your')) {
+  if (!rawUrl && stabilityKey && !stabilityKey.includes('your')) {
     try {
       const stabilityResult = await runStabilitySearchReplace(input, stabilityKey);
-      if (stabilityResult.editedImageUrl) return stabilityResult;
+      if (stabilityResult.editedImageUrl) {
+        rawUrl = stabilityResult.editedImageUrl;
+        provider = 'stability';
+      }
     } catch (err) {
       console.error('editKitchenPhoto stability error', err);
     }
   }
 
-  if (!replicateToken && !stabilityKey) {
-    return { editedImageUrl: null, error: 'no_edit_api_keys' };
+  if (!rawUrl) {
+    if (!replicateToken && !stabilityKey) {
+      return { editedImageUrl: null, error: 'no_edit_api_keys' };
+    }
+    return { editedImageUrl: null, error: 'all_providers_failed' };
   }
 
-  return { editedImageUrl: null, error: 'all_providers_failed' };
+  const publicUrl = await finalizePublicImageUrl(rawUrl);
+  if (!publicUrl) {
+    return { editedImageUrl: null, error: 'cloudinary_or_url_failed' };
+  }
+
+  return { editedImageUrl: publicUrl, provider };
 }
 
 export function editFailureMessage(lang: string): string {

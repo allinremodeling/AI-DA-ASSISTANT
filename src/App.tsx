@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { getAuthRedirectUrl } from './lib/authRedirect'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChatInterface } from './components/ChatInterface'
 import LoginPage from './components/LoginPage'
 
@@ -53,7 +54,9 @@ export default function App() {
   if (session) {
     return (
       <div className="h-screen w-screen bg-white text-[#111111] overflow-hidden">
-        <ChatInterface mode="authenticated" onLogout={() => supabase.auth.signOut()} />
+        <ErrorBoundary>
+          <ChatInterface mode="authenticated" onLogout={() => supabase.auth.signOut()} />
+        </ErrorBoundary>
       </div>
     )
   }
@@ -71,10 +74,12 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen bg-white text-[#111111] overflow-hidden">
-      <ChatInterface
-        mode="guest"
-        onSignIn={supabaseConfigured ? () => setShowLogin(true) : undefined}
-      />
+      <ErrorBoundary>
+        <ChatInterface
+          mode="guest"
+          onSignIn={supabaseConfigured ? () => setShowLogin(true) : undefined}
+        />
+      </ErrorBoundary>
     </div>
   )
 }

@@ -87,6 +87,7 @@ export interface ChatMessage {
   originalImage?: string
   editPhotoApplied?: boolean
   editPhotoPending?: boolean
+  editPhotoPrompt?: string
   isLoading?: boolean
   isError?: boolean
 }
