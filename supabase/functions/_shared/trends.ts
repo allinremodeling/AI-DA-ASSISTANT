@@ -144,7 +144,25 @@ function matchCuratedTrends(query: string, limit = 3): TrendResult[] {
   return picked;
 }
 
-function matchExternalInspiration(query: string, keywords: string[] = [], limit = 3): TrendResult[] {
+export function hashSeed(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (Math.imul(31, h) + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+export function pickRotated<T>(items: T[], seed: string): T | undefined {
+  if (items.length === 0) return undefined;
+  return items[hashSeed(seed) % items.length];
+}
+
+function matchExternalInspiration(
+  query: string,
+  keywords: string[] = [],
+  limit = 3,
+  seed = '',
+): TrendResult[] {
   const q = `${query} ${keywords.join(' ')}`.toLowerCase();
   const scored = EXTERNAL_INSPIRATION.map((item) => {
     let score = 0;
@@ -159,7 +177,13 @@ function matchExternalInspiration(query: string, keywords: string[] = [], limit 
     return { item, score };
   }).sort((a, b) => b.score - a.score);
 
-  const picked = scored.filter((x) => x.score > 0).map((x) => ({
+  const topScore = scored[0]?.score ?? 0;
+  const tier = scored.filter((x) => x.score >= Math.max(1, topScore - 2));
+  const pool = tier.length > 0 ? tier : scored;
+  const offset = hashSeed(seed || query) % Math.max(1, pool.length);
+  const rotated = [...pool.slice(offset), ...pool.slice(0, offset)];
+
+  const picked = rotated.filter((x) => x.score > 0).map((x) => ({
     title: x.item.title,
     text: x.item.text,
     imageUrl: x.item.imageUrl,
@@ -167,9 +191,11 @@ function matchExternalInspiration(query: string, keywords: string[] = [], limit 
   }));
 
   if (picked.length >= limit) return picked.slice(0, limit);
-  const fallback = EXTERNAL_INSPIRATION.map(({ title, text, imageUrl, source }) => ({
-    title, text, imageUrl, source,
-  }));
+  const fallbackOffset = hashSeed(seed || keywords.join('-') || query) % EXTERNAL_INSPIRATION.length;
+  const fallback = [
+    ...EXTERNAL_INSPIRATION.slice(fallbackOffset),
+    ...EXTERNAL_INSPIRATION.slice(0, fallbackOffset),
+  ].map(({ title, text, imageUrl, source }) => ({ title, text, imageUrl, source }));
   return [...picked, ...fallback].slice(0, limit);
 }
 
@@ -257,10 +283,11 @@ export interface InspirationSearchOptions {
 export async function searchInspirationReferences(
   query: string,
   lang = 'es',
-  options: InspirationSearchOptions = {},
+  options: InspirationSearchOptions & { seed?: string } = {},
 ): Promise<TrendResult[]> {
   const keywords = options.keywords || [];
   const excludeUrls = options.excludeUrls || [];
+  const seed = options.seed || query;
   const imageQuery = buildInspirationImageQuery(keywords.length ? keywords : [query.slice(0, 80)], lang);
 
   const queries = [
@@ -283,24 +310,39 @@ export async function searchInspirationReferences(
   }
 
   if (merged.length > 0) {
-    return merged.slice(0, 3);
+    const offset = hashSeed(seed) % merged.length;
+    const rotated = [...merged.slice(offset), ...merged.slice(0, offset)];
+    return rotated.slice(0, 3);
   }
 
-  const external = matchExternalInspiration(query, keywords, 3)
+  const external = matchExternalInspiration(query, keywords, 3, seed)
     .filter((r) => !isExcludedUrl(r.imageUrl, excludeUrls));
 
-  return external.length > 0 ? external : matchExternalInspiration('', keywords, 2);
+  return external.length > 0 ? external : matchExternalInspiration('', keywords, 2, seed);
 }
 
+export function pickVariedInspiration(
+  refs: TrendResult[],
+  excludeUrls: string[] = [],
+  seed = '',
+): TrendResult | undefined {
+  const external = refs.filter((r) =>
+    r.imageUrl
+    && !isExcludedUrl(r.imageUrl, excludeUrls)
+    && !isInternalBrandUrl(r.imageUrl),
+  );
+  const pool = external.length > 0
+    ? external
+    : refs.filter((r) => r.imageUrl && !isExcludedUrl(r.imageUrl, excludeUrls));
+  return pickRotated(pool, seed || 'inspiration');
+}
+
+/** @deprecated use pickVariedInspiration */
 export function pickUniqueInspiration(
   refs: TrendResult[],
   excludeUrls: string[] = [],
 ): TrendResult | undefined {
-  return refs.find((r) =>
-    r.imageUrl
-    && !isExcludedUrl(r.imageUrl, excludeUrls)
-    && !isInternalBrandUrl(r.imageUrl),
-  ) || refs.find((r) => r.imageUrl && !isExcludedUrl(r.imageUrl, excludeUrls));
+  return pickVariedInspiration(refs, excludeUrls);
 }
 
 export { matchPortfolio, ALLIN_PORTFOLIO, normalizeUrlKey, isExcludedUrl };

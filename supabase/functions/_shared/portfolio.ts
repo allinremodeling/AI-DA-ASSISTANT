@@ -56,7 +56,7 @@ export const ALLIN_PORTFOLIO: PortfolioReference[] = [
   },
 ];
 
-export function matchPortfolio(query: string, limit = 3): PortfolioReference[] {
+export function matchPortfolio(query: string, limit = 3, seed = ''): PortfolioReference[] {
   const q = query.toLowerCase();
   const scored = ALLIN_PORTFOLIO.map((item) => {
     let score = 0;
@@ -66,11 +66,25 @@ export function matchPortfolio(query: string, limit = 3): PortfolioReference[] {
     return { item, score };
   }).sort((a, b) => b.score - a.score);
 
-  const withScore = scored.filter((x) => x.score > 0).map((x) => x.item);
+  const topScore = scored[0]?.score ?? 0;
+  const tier = scored.filter((x) => x.score >= Math.max(1, topScore - 2));
+  const pool = tier.length > 0 ? tier : scored;
+  let h = 0;
+  for (let i = 0; i < (seed || query).length; i++) {
+    h = (Math.imul(31, h) + (seed || query).charCodeAt(i)) | 0;
+  }
+  const offset = Math.abs(h) % Math.max(1, pool.length);
+  const rotated = [...pool.slice(offset), ...pool.slice(0, offset)];
+
+  const withScore = rotated.filter((x) => x.score > 0).map((x) => x.item);
   if (withScore.length >= limit) return withScore.slice(0, limit);
 
   const picked = [...withScore];
-  for (const item of ALLIN_PORTFOLIO) {
+  const fallbackOrder = [
+    ...ALLIN_PORTFOLIO.slice(offset),
+    ...ALLIN_PORTFOLIO.slice(0, offset),
+  ];
+  for (const item of fallbackOrder) {
     if (picked.length >= limit) break;
     if (!picked.includes(item)) picked.push(item);
   }

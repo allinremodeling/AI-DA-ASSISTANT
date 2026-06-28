@@ -10,6 +10,7 @@ if (-not (Test-Path ".env.local")) {
 }
 
 Write-Host "Building for /ai/ ..." -ForegroundColor Cyan
+$env:VITE_AUTH_REDIRECT_URL = "https://allinremodeling.us/ai/"
 npm run build:cpanel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

@@ -7,7 +7,7 @@ Integrado con **[SmartSlab](https://smartslab.app)** marketplace de slabs y rema
 **Live:** [ai-da-assistant.netlify.app](https://ai-da-assistant.netlify.app/)  
 **cPanel:** [allinremodeling.us/ai/](https://allinremodeling.us/ai/)
 
-**Deploy cPanel (archivo listo):** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) — generar con `npm run deploy:cpanel`. Guía completa: [`DEPLOY-CPANEL.md`](DEPLOY-CPANEL.md).
+**Deploy cPanel (V1.5.1):** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) — generar con `npm run deploy:cpanel`. Asset actual: `index-C3qpciC7.js`. Guía: [`DEPLOY-CPANEL.md`](DEPLOY-CPANEL.md).
 
 ---
 
@@ -100,7 +100,7 @@ V1.5.0 usa **OpenAI Vision** (`gpt-4o-mini`) con `OPENAI_API_KEY`. Si la key no 
 |------|-------|----------|
 | **Frontend** | cPanel `public_html/ai/` | React SPA en `allinremodeling.us/ai` |
 | **Chat API** | Supabase Edge Function `chat` | OpenAI Vision, Tavily, SmartSlab, GPT orchestrator |
-| **Auth** | Supabase Auth | Login / registro usuarios AI-DA |
+| **Auth** | Supabase Auth | Login / registro; confirmación por correo → `https://allinremodeling.us/ai/` con sesión PKCE |
 
 El frontend **no** lleva API keys de OpenAI/Anthropic — solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
@@ -182,12 +182,17 @@ Claude Code en el proyecto: [`docs/CLAUDE-CODE.md`](docs/CLAUDE-CODE.md)
 
 ## Changelog
 
-### v1.5.1 — 2026-06-25
+### v1.5.1 — 2026-06-27 (release cPanel + backend)
 
-- **Asistente virtual fluido**: Anthropic Claude (prioridad) + OpenAI fallback; historial en el LLM para refinamientos naturales
-- **Card 2 inspiración**: imagen siempre visible; búsqueda waterfall/keywords; sin duplicar foto All In
-- **SmartSlab UI**: card ancho completo; imágenes sin recorte al final del chat
-- Docs: [`docs/V1-5-1.md`](docs/V1-5-1.md)
+Modelo **AI-DA V1.5.1** — bundle cPanel para [allinremodeling.us/ai/](https://allinremodeling.us/ai/) (`index-C3qpciC7.js`).
+
+- **Confirmación de cuenta**: redirect a producción (`VITE_AUTH_REDIRECT_URL`), PKCE + `authCallback.ts`; login automático al abrir el enlace del correo
+- **Card 1 análisis**: texto obligatorio server-side (visión + mensaje + contexto web) si GPT devuelve bloque vacío o título genérico “Kitchen Analysis”
+- **Cards 2–3**: rotación de inspiración (Tavily/Unsplash) y recomendación All In por consulta — evita repetir siempre la misma foto
+- **Asistente virtual fluido**: Anthropic Claude (prioridad) + OpenAI fallback; historial en el LLM
+- **Card 2 inspiración**: imagen inyectada server-side; sin duplicar foto All In
+- **SmartSlab UI**: card ancho completo; imágenes sin recorte
+- Docs: [`docs/V1-5-1.md`](docs/V1-5-1.md) · deploy: `npm run deploy:cpanel` + `npm run deploy:chat`
 
 ### v1.5.0 — 2026-06-26
 

@@ -12,8 +12,8 @@ Guía paso a paso para publicar **AI-DA V1.5.1** en tu hosting cPanel.
 |---------|---------|----------------|
 | GitHub `main` | **V1.5.1** | Repo actualizado |
 | Build local | **V1.5.1** | `deploy-cpanel-ai.zip` en raíz |
-| Asset JS actual | **V1.5.1** | DevTools → `index-C0Y4eEkv.js` |
-| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ⚠️ Subir ZIP | Debe cargar `index-C0Y4eEkv.js` |
+| Asset JS actual | **V1.5.1** | DevTools → `index-C3qpciC7.js` |
+| [allinremodeling.us/ai/](https://allinremodeling.us/ai/) | ✅ V1.5.1 | Debe cargar `index-C3qpciC7.js` |
 | Supabase `chat` | ✅ Tras `npm run deploy:chat` | POST → 200 con `blocks[]` |
 
 **Acción pendiente (solo cPanel):** subir **`deploy-cpanel-ai.zip`** a `public_html/ai/` y extraer. Backend V1.5.1 ya desplegado con `npm run deploy:chat`.
@@ -30,7 +30,7 @@ Guía paso a paso para publicar **AI-DA V1.5.1** en tu hosting cPanel.
 
 **Archivo listo para subir:** [`deploy-cpanel-ai.zip`](deploy-cpanel-ai.zip) (raíz del proyecto — regenerar con `npm run deploy:cpanel`)
 
-**Build actual (V1.5.1):** `assets/index-C0Y4eEkv.js` · `assets/index-DH6AD-i6.css`
+**Build actual (V1.5.1):** `assets/index-C3qpciC7.js` · `assets/index-DPOOnIVn.css`
 
 ---
 

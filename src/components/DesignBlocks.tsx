@@ -332,14 +332,20 @@ function DesignBlockCard({
       )}
       <div className="p-3.5 sm:p-4 space-y-2 flex-1">
         <h4 className="text-sm font-semibold text-[#111111] leading-snug">{block.title}</h4>
-        {variant === 'analysis' || variant === 'inspiration' ? (
-          <RichText
-            text={block.text}
-            className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed"
-          />
-        ) : (
-          <p className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed">{block.text}</p>
-        )}
+        {block.text ? (
+          variant === 'analysis' || variant === 'inspiration' ? (
+            <RichText
+              text={block.text}
+              className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed"
+            />
+          ) : (
+            <p className="text-xs sm:text-[13px] text-[#6b6b6b] leading-relaxed">{block.text}</p>
+          )
+        ) : variant === 'analysis' ? (
+          <p className="text-xs sm:text-[13px] text-[#999] italic leading-relaxed">
+            Analizando tu proyecto… envía una foto o describe estilo, medidas y materiales para un análisis detallado.
+          </p>
+        ) : null}
         {block.source && (
           <p className="text-[10px] text-[#999999] truncate">
             {isExternal ? `Referencia: ${block.source}` : `Fuente: ${block.source}`}

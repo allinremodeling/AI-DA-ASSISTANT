@@ -81,24 +81,27 @@ export default {
         || message.slice(0, 40);
 
       const designKeywords = extractDesignKeywords(message, visionAnalysis, fullContext);
+      const selectionSeed = `${message}|${history.length}|${guestTurn ?? 0}|${searchDate}`;
 
-      const [analysisWeb, smartslabListings, products, portfolio] = await Promise.all([
+      const [analysisWeb, smartslabListings, products, portfolioMatches] = await Promise.all([
         searchAnalysisContext(contextQuery, searchDate, lang),
         searchSmartSlabListings(contextQuery, 1, dimensions.requiredSqft),
         searchProducts(ctx.supabaseAdmin, productQuery),
-        Promise.resolve(matchPortfolio(contextQuery, 1)),
+        Promise.resolve(matchPortfolio(contextQuery, 5, selectionSeed)),
       ]);
 
-      const portfolioItem = portfolio[0] || ALLIN_PORTFOLIO[0];
+      const portfolioItem = portfolioMatches[0] || ALLIN_PORTFOLIO[0];
+      const portfolioImages = portfolioMatches.map((p) => p.imageUrl).filter(Boolean);
       const inspirationExcludeUrls = [
+        ...portfolioImages,
         String((products[0] as Record<string, unknown> | undefined)?.image_url || ''),
-        portfolioItem.imageUrl,
       ].filter(Boolean);
 
       const inspirationWeb = await searchInspirationReferences(contextQuery, lang, {
         keywords: designKeywords,
         excludeUrls: inspirationExcludeUrls,
         lang,
+        seed: selectionSeed,
       });
 
       const services = matchEcosystemServices(`${message} ${visionAnalysis}`, 4);
@@ -121,6 +124,8 @@ export default {
         services,
         smartslabListings,
         portfolioItem,
+        portfolioImages,
+        selectionSeed,
       });
 
       let generatedImage: string | undefined;

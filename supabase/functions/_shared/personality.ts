@@ -50,6 +50,7 @@ OUTPUT JSON ONLY:
 {"intro":"...","blocks":[...],"followUp":"...","editPhoto":{"prompt":"..."}}
 
 - blocks: exactly 4 types in order — analysis, inspiration, recommendation, marketplace (we inject action_plan).
+- analysis.text is REQUIRED (min 120 chars). Never use generic titles like "Kitchen Analysis".
 - Wrap key terms in **double asterisks** in analysis text.
 - editPhoto.prompt: ONLY when user uploaded a photo AND wants a visual change (color, material, style). Empty object {} or omit if no edit needed.
 - editPhoto.prompt must be English, photorealistic, preserve kitchen layout: e.g. "modern kitchen with white shaker cabinets and calacatta quartz waterfall island, photorealistic, same perspective"

@@ -1,7 +1,5 @@
 import type { Product, AssistantResponse } from './types';
-import { createClient } from './supabase';
-
-const supabase = createClient();
+import { supabase } from './supabase';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 const ASSISTANT_ID = import.meta.env.VITE_OPENAI_ASSISTANT_ID;

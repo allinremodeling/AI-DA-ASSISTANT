@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
-import { getAuthRedirectUrl } from './lib/authRedirect'
+import { completeAuthFromUrl } from './lib/authCallback'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChatInterface } from './components/ChatInterface'
 import LoginPage from './components/LoginPage'
@@ -19,13 +19,8 @@ export default function App() {
     if (!supabaseConfigured) return
 
     const initAuth = async () => {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) console.error('Auth email confirmation failed:', error.message)
-        window.history.replaceState({}, '', getAuthRedirectUrl())
-      }
+      const { error } = await completeAuthFromUrl()
+      if (error) console.error('Auth email confirmation failed:', error)
 
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
